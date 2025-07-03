@@ -1,0 +1,47 @@
+---
+title: "01_Comparaison concentrations"
+output: html_document
+---
+
+### Packages
+
+```{r}
+#install.packages("pheatmap")
+library(here)
+library(pheatmap)
+library(ggplot2)
+library(dplyr)
+```
+
+### Import
+
+```{r}
+concentration_IgA <- openxlsx::read.xlsx(here::here("data/raw_data/20250507_concentrations_IgA _avec_test.xlsx"))
+```
+
+### Comparaisons concentrations
+
+```{r}
+kruskal.test(IgA_ng_mL ~ plaque, data = concentration_IgA)
+```
+
+```{r}
+attach(concentration_IgA)
+p <-pairwise.wilcox.test(IgA_ng_mL,plaque,p.adjust.method = "holm",paired = FALSE)
+p
+detach(concentration_IgA)
+```
+
+```{r}
+##Boxplot
+ggplot2::ggplot(concentration_IgA, aes(x = factor(plaque), y = IgA_ng_mL)) +
+  geom_boxplot(fill = "lightblue", color = "black") +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  theme_minimal() +
+  labs(
+    title = "Concentrations d'IgA par plaque",
+    x = "Plaque",
+    y = "IgA (ng/mL)"
+  )
+
+```

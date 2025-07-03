@@ -1,0 +1,39 @@
+---
+title: "20250317_data_bpm"
+output: html_document
+
+Jeu de données issu, des fiches de dissection des TDs de mulots, pour identification dans BPM
+---
+
+```{r}
+# Package loading 
+library ("dplyr")
+library("here")
+install.packages("openxlsx")
+library(openxlsx)
+install.packages("tidyverse")
+library(tidyverse)
+```
+
+```{r}
+# Importation 
+fiche_dissection <- openxlsx::read.xlsx(here::here("data/raw_data/20250317_fiche_dissection.xlsx"),sep="\t", sheet = "tableau")
+```
+
+```{r}
+#Pivot
+data_bpm <- fiche_dissection %>%
+  pivot_longer(cols = -code_rongeur, names_to = "morphotype", values_to = "nombre") %>%
+  filter(nombre > 0) %>%  # Garde uniquement les cas où un morphotype est présent
+  group_by(code_rongeur) %>%  
+  mutate(occurrence = row_number(),  # Numérote les occurrences
+         code_rongeur = ifelse(occurrence == 1, 
+                           paste0(code_rongeur, "_WO"), 
+                           paste0(code_rongeur, "_WO-", occurrence))) %>%
+  select(-occurrence)
+```
+
+```{r}
+#Exportation
+write.xlsx(data_bpm, here::here("data/derived_data/20250317_data_pour_suivi_bpm.xlsx"))
+```

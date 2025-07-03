@@ -1,0 +1,6 @@
+"0","# Importation 
+fiche_dissection <- openxlsx::read.xlsx(here::here(""data/raw_data/20250317_fiche_dissection.xlsx""),sep=""\t"", sheet = ""tableau"")
+"
+"2","Erreur dans read.xlsx.default(here::here(""data/raw_data/20250317_fiche_dissection.xlsx""),  : 
+  Cannot find sheet named ""tableau""
+"

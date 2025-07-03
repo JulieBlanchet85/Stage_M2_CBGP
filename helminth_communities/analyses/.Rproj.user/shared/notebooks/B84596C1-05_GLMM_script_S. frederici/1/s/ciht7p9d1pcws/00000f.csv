@@ -1,0 +1,19 @@
+"0","## Intensite"
+"0","drop1(ModelSelected_intensite_glmm,.~.,test=""Chisq"")"
+"1","Single term deletions
+
+Model:
+syphacia_frederici ~ sexe + SMI_z + poids_z + richesse_spe_AP_z + 
+    (1 | code_rongeur)
+                  npar    AIC     LRT Pr(Chi)
+<none>                 297.71                
+sexe                 1 295.75 0.03910  0.8433
+SMI_z                1 295.71 0.00234  0.9614
+poids_z              1 296.47 0.76424  0.3820
+richesse_spe_AP_z    1 296.45 0.74086  0.3894
+"
+"0","#ANOVA tient compte positions variables donc pas cool"
+"0","#drop 1 tient pas compte position variable dans code donc cool"
+"0","#df = nb modalité de la variable -1"
+"0","# LRT c'est la valuer de test"
+"0","#Test si effet significatif de la variable sur le modèle"

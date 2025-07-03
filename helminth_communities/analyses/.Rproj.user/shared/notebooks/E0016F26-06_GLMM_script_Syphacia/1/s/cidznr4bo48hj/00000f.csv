@@ -1,0 +1,68 @@
+"0","## Présences-absences"
+"0","SelectionModels_pres_abs_glmm<-MuMIn::dredge(glmm_pres_abs,rank = ""AICc"")"
+"2","G3;Fixed term is ""(Intercept)""
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"0","#logLik = vraisemblance du modèle (+ proche de 0 = meilleur(je crois))"
+"0","#delta = différence d'AICc par rapport au meilleure modèle (souvent on considère que les modèle qui ont un delta <2)"
+"0","#weight = Poids d'Akaike (proba que ça soit le meilleur modèle parmi ceux testé)"
+"0",""
+"0","TopModels_pres_abs_glmm<-subset(SelectionModels_pres_abs_glmm,delta<2) "
+"0","TopModels_pres_abs_glmm"
+"1","Global model call: glmer(formula = syphacia ~ sexe + poids_z + SMI_z + habitat1 + 
+    richesse_spe_AP_z + (1 | numero_ligne), data = t_pres_abs, 
+    family = binomial(link = ""logit""), control = glmerControl(optCtrl = list(maxfun = 20000)), 
+    na.action = ""na.fail"")
+---
+Model selection table 
+      (Int)  pds_z rch_spe_AP_z sex   SMI_z df  logLik  AICc delta weight
+19  0.16180 0.4022                  -0.3209  4 -77.100 162.6  0.00  0.105
+11 -0.11150 0.2897                +          4 -77.111 162.6  0.02  0.104
+9  -0.10610                       +          3 -78.229 162.7  0.11  0.100
+3   0.16010 0.2766                           3 -78.301 162.8  0.25  0.093
+1   0.15680                                  2 -79.359 162.8  0.26  0.092
+27 -0.06561 0.3971                + -0.2792  5 -76.251 163.1  0.49  0.082
+5   0.15850              0.2601              3 -78.454 163.1  0.56  0.080
+13 -0.07915              0.2316   +          4 -77.557 163.5  0.91  0.067
+7   0.16240 0.2234       0.1949              4 -77.831 164.0  1.46  0.051
+23  0.16390 0.3505       0.1676     -0.3051  5 -76.758 164.1  1.50  0.050
+17  0.15770                         -0.1660  3 -78.972 164.2  1.60  0.047
+15 -0.09117 0.2471       0.1581   +          5 -76.825 164.2  1.64  0.046
+25 -0.08245                       + -0.1226  4 -78.032 164.4  1.86  0.041
+21  0.16140              0.2624     -0.1727  4 -78.041 164.4  1.88  0.041
+Models ranked by AICc(x) 
+Random terms (all models): 
+  1 | numero_ligne
+
+"

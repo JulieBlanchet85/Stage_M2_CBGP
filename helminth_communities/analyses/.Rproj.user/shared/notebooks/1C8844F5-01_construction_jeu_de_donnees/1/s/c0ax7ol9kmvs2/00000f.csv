@@ -1,0 +1,6 @@
+"0","autres_pathos <- read.csv(here::here(""data/raw_data/20250414_others_pathos.csv""), sep = "";"")"
+"0",""
+"0","autres_pathos <- autres_pathos %>%"
+"0","  rename(richesse_spe_AP = number_pathos)%>%"
+"0","  rename(code_rongeur = numero_centre)%>%"
+"0","  select(code_rongeur,richesse_spe_AP)"

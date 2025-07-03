@@ -1,0 +1,16 @@
+"0","## Intensité"
+"0","ModelSelected_intensite_glmm <-glmer(syphacia_frederici~sexe+SMI_z+poids_z+richesse_spe_AP_z+(1|code_rongeur),data=t_infectes,family=poisson(link=""log""),na.action=""na.fail"",control=glmerControl(optimizer = ""bobyqa"", optCtrl = list(maxfun = 20000)))"
+"0",""
+"0","overdisp.glmer(ModelSelected_intensite_glmm)"
+"1","Residual deviance: 3.446 on 32 degrees of freedom (ratio: 0.108)
+"
+"0","check_overdispersion(ModelSelected_intensite_glmm)"
+"1","[34m# Overdispersion test
+
+[39m       dispersion ratio = 0.094
+  Pearson's Chi-Squared = 3.005
+                p-value =     1
+
+"
+"2","G3;No overdispersion detected.
+g"

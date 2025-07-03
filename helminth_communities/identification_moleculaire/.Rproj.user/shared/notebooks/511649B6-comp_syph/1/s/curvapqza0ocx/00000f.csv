@@ -1,0 +1,16 @@
+"0","library(openxlsx)"
+"0","library(dplyr)"
+"2","G3;
+Attachement du package : ‘dplyr’
+
+g"
+"2","G3;Les objets suivants sont masqués depuis ‘package:stats’:
+
+    filter, lag
+
+g"
+"2","G3;Les objets suivants sont masqués depuis ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+g"

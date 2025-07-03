@@ -1,0 +1,4 @@
+"0",""
+"0","#option 2 "
+"0","Res<-DHARMa::simulateResiduals(ModelSelected_intensite_glmm, n = 250, refit = F, integerResponse = NULL, plot = F, seed = 123) "
+"0","plot(Res, rank = TRUE) "

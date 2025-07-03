@@ -1,0 +1,15 @@
+"0","## Intensité"
+"0","ModelSelected_intensite_glmm <- glmmTMB::glmmTMB(heligmosomoides_polygyrus ~ habitat1+ poids_z + SMI_z +(1 | numero_ligne), data = t_infectes,family = nbinom2, na.action = na.fail)"
+"0",""
+"0","#ModelSelected_intensite_glmm <- glmer.nb(heligmosomoides_polygyrus ~ habitat1+ poids_z + SMI_z +(1 | numero_ligne), data = t_infectes, na.action = na.fail)"
+"0",""
+"0","#overdisp.glmer(ModelSelected_intensite_glmm) #--> fonctionne  avec glmer"
+"0","check_overdispersion(ModelSelected_intensite_glmm) # --> focntionne pour glmmTMB"
+"1","[34m# Overdispersion test
+
+[39m dispersion ratio = 1.199
+          p-value = 0.464
+
+"
+"2","G3;No overdispersion detected.
+g"

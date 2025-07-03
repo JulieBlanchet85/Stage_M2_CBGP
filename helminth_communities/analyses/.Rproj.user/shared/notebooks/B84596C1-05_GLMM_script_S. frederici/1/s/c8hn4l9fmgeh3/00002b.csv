@@ -1,0 +1,11 @@
+"0",""
+"0","testDispersion(Res)"
+"1","
+"
+"1","	DHARMa nonparametric dispersion test via sd of residuals fitted vs. simulated
+
+data:  simulationOutput
+dispersion = 0.51562, p-value = 0.864
+alternative hypothesis: two.sided
+
+"

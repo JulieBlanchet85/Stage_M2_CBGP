@@ -1,0 +1,2 @@
+"0","data <- fiche_dissection %>%"
+"0","  select(""code_rongeur"",""syphacia_ant"",""heligmosomoides_polygyrus"",""hymenolepis_hiberna"",""syphacia_caecum"",""syphacia_post"",""trichuris"",""hydatigera_parva"",""aspiculuris_tetraptera"",""skrjabinotaenia_lobata"",""numero_ligne"",""demogroup"",""sexe"",""gestation"",""SMI"",""poids"",""longueur_tete_corps"",""richesse_spe_AP"",""habitat1"",""habitat2"")"

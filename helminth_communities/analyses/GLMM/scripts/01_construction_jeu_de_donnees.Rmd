@@ -1,0 +1,179 @@
+---
+title: "02_faux_jeu_de_donnees"
+output: html_document
+date: "2025-04-16"
+---
+
+## \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+## CONSTRUCTION DU JEU DE DONNEES \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+```{r, include = FALSE}
+## Package loading ----
+library ("dplyr")
+library("here")
+#install.packages("openxlsx")
+library(openxlsx)
+#install.packages("tidyverse")
+#install.packages("smatr")
+library(tidyverse)
+library(readxl)
+library(smatr)
+library(ggplot2)
+```
+
+## Chargement fichiers morphotypes
+
+```{r}
+fiche_dissection <- read.csv(here::here("GLMM/data/derived_data/20250522_fiche_dissection_inferee.csv"), sep=";")
+```
+
+## Données mulots
+
+### Chargement
+
+```{r}
+donnees_rongeurs <- read.csv(here::here("GLMM/data/raw_data/20250124_apodemus_modalities.csv"), sep=";")
+
+donnees_rongeurs <- donnees_rongeurs %>%
+  select(code_mission,year,season, numero_centre,numero_ligne, sexe, poids, type, longueur_tete_corps, gestation, demogroup) %>%
+  rename(code_rongeur = numero_centre) %>%
+  mutate(gestation = case_when(
+    gestation %in% "+" ~ "oui",
+    gestation %in% c("-", "", NA) ~ "non",
+    TRUE ~ "non"  # Par défaut, on met "non" pour toute autre valeur éventuelle
+  ))
+```
+
+### Jointure morphotypes et données mulots
+
+```{r}
+fiche_dissection <- fiche_dissection %>%
+  left_join(donnees_rongeurs, by = "code_rongeur") %>%
+  select(-year, -season, -code_mission) %>%
+  rename(habitat2 = type) %>%
+  mutate(
+    habitat1 = case_when(
+      habitat2 %in% c("NC_HB", "NC_LB", "C_HB", "C_LB") ~ "haie",
+      habitat2 %in% c("CT_HB", "CT_LB") ~ "pins",
+      habitat2 == "B" ~ "feuillus",
+      TRUE ~ NA_character_
+    )
+  )
+```
+
+### Ajout ICP = Scaled mass index
+
+```{r}
+### Enlever les femelles gestantes dans la mesure ?
+fiche_dissection %>%
+  dplyr::count(gestation)%>%
+  mutate(pourcentage = n / sum(n) * 100) #🔴 13% de gestante même si plus que 10% je choisi de les enlever 
+
+
+```
+
+```{r}
+## Calcul b_SMA (pente de la regression SMA de Log(poids) ~ Log(longueur))
+### Regression sma
+#sma_model <- smatr::sma(log(poids)~log(longueur_tete_corps), data = #fiche_dissection) 
+# on utilise log car relation non linéaire mais allométrique entre poid et longueur
+# regression SMA prend en compte la variablilité des deux variables et est plus appropriée pour des relations biologiques symétriques que regression linéaire
+
+### Extraction des coeff du modèle
+#coef(sma_model)
+#b_SMA <- coef(sma_model)[2]
+# [2] permet d'extraire le deuxieme indice celui qui correspond au coefficient de pente
+#b_SMA   #🔴 b_SMA de 2,875915
+```
+
+```{r}
+#b_SMA sans les femelles gestantes
+
+donnees_non_gestantes <- fiche_dissection %>%
+  filter(gestation == "non")
+
+### Régression SMA
+sma_model <- smatr::sma(log(poids) ~ log(longueur_tete_corps), data = donnees_non_gestantes)
+
+### Extraction du coefficient de pente
+coef(sma_model)
+b_SMA <- coef(sma_model)[2]
+b_SMA
+
+# 🔴 donne un b_SMA de 2.75494
+```
+
+```{r}
+##Calcul de L0 = moyenne des longueurs
+#L0 <- mean(fiche_dissection$longueur_tete_corps)
+#L0   # 🔴 LO de 90,35652
+```
+
+```{r}
+##Calcul de L0 = moyenne des longueurs sans les femelles gestantes
+L0 <- mean(donnees_non_gestantes$longueur_tete_corps)
+L0
+# 🔴 89.91
+```
+
+```{r}
+##Calcul SMI
+fiche_dissection$SMI <- fiche_dissection$poids*(L0/fiche_dissection$longueur_tete_corps)^b_SMA
+
+mean(fiche_dissection$SMI)
+median(fiche_dissection$SMI)
+
+#🔴 moyenne SMI de 20.41967 quand b_SMA et LO calculé sans femelles gestantes
+#🔴 médiane SMI de 20.17897 quand b_SMA et LO calculé sans femelles gestantes
+#🔴 moyenne SMI de 20.712 quand b_SMA et LO calculé avec femelles gestantes
+#🔴 médiane SMI de 20.47779 quand b_SMA et LO calculé avec femelles gestantes
+#
+```
+
+```{r}
+ggplot(fiche_dissection, aes(x = SMI)) +
+  geom_histogram(bins = 20, fill = "#69b3a2", color = "white") +
+  labs(
+    title = "Distribution du Scaled Mass Index (SMI)",
+    x = "SMI (en g)",
+    y = "Effectif"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+summary(fiche_dissection$SMI)
+```
+
+### Autres pathogènes
+
+Ajout de la richesse en agents pathogènes bactériens présents chez chaque mulot
+
+```{r}
+autres_pathos <- read.csv(here::here("GLMM/data/raw_data/20250414_others_pathos.csv"), sep = ";")
+
+autres_pathos <- autres_pathos %>%
+  rename(richesse_spe_AP = number_pathos)%>%
+  rename(code_rongeur = numero_centre)%>%
+  select(code_rongeur,richesse_spe_AP)
+```
+
+#### Jointure morphotypes-mulots et autres AP
+
+```{r}
+fiche_dissection <- fiche_dissection %>%
+  left_join(autres_pathos, by = "code_rongeur")
+```
+
+## Export
+
+```{r}
+data <- fiche_dissection %>%
+  select("code_rongeur","syphacia_stroma","heligmosomoides_polygyrus","hymenolepis_hiberna","syphacia_frederici","trichuris","hydatigera_parva","aspiculuris_tetraptera","skrjabinotaenia_lobata","numero_ligne","demogroup","sexe","gestation","SMI","poids","longueur_tete_corps","richesse_spe_AP","habitat1","habitat2")
+```
+
+```{r}
+write.csv(data, here::here("data/derived_data/20250522_jd_complet.csv"), row.names = FALSE, quote = TRUE)
+```

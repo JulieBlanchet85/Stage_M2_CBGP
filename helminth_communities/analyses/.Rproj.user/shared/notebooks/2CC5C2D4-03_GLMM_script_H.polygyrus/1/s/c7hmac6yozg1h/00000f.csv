@@ -1,0 +1,4 @@
+"0","t <-read.csv(here::here(""data/derived_data/20250519_jd_complet.csv""), sep = "","")"
+"0",""
+"0","t$habitat1=as.factor(t$habitat1)"
+"0","t$habitat2=as.factor(t$habitat2)"

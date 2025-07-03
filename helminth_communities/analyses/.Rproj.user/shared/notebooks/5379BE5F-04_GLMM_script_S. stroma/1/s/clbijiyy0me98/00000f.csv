@@ -1,0 +1,27 @@
+"0","attach(t_pres_abs)"
+"0","emmeans::emmeans(ModelSelected_pres_abs_glmm,pairwise ~ habitat1, type = 'response') #response c'est pour remettre sur l'echelle réelle (c'est du début, donc le nb de paraasite)"
+"1","$emmeans
+"
+"1"," habitat1  prob     SE  df asymp.LCL asymp.UCL
+ feuillus 0.553 0.1190 Inf     0.325     0.762
+ haie     0.238 0.0538 Inf     0.149     0.358
+ pins     0.379 0.1430 Inf     0.157     0.667
+
+Results are averaged over the levels of: sexe 
+Confidence level used: 0.95 
+Intervals are back-transformed from the logit scale 
+
+$contrasts
+ contrast        odds.ratio    SE  df null z.ratio p.value
+ feuillus / haie      3.969 2.270 Inf    1   2.408  0.0424
+ feuillus / pins      2.029 1.600 Inf    1   0.900  0.6402
+ haie / pins          0.511 0.329 Inf    1  -1.042  0.5504
+
+Results are averaged over the levels of: sexe 
+P value adjustment: tukey method for comparing a family of 3 estimates 
+Tests are performed on the log odds ratio scale 
+
+"
+"0","detach(t_pres_abs)"
+"0","#emmeans : intensité moyennes obtenues"
+"0","#contrasts : ratios et p_values"

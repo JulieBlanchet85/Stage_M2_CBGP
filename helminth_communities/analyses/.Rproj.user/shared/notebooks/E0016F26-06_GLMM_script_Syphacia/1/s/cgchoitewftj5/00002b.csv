@@ -1,0 +1,17 @@
+"0","# QQ plot : résidu doivent suivre la droite rouge, ça veut dire que résidus suivent la distribution attendue"
+"0","  # KS test (Kolmogorov-Smirnov test) : Ce test compare la distribution des résidus avec une distribution théorique. p = 0 signifie que le test a rejeté l'hypothèse nulle (que les résidus suivent une distribution donnée) avec une très forte évidence."
+"0","  #Dispersion test : Ce test évalue si la dispersion (ou la variance) des résidus est homogène ou non.p = 0 indique une déviation significative, ce qui signifie qu'il y a une violation de l'hypothèse d'homogénéité de la variance. (homo-hétéroscédasticité)"
+"0","  #Outlier test : Cherche à identifier les points de données qui sont des outliers dans ton modèle.p = 0 dans ce test signifie qu'il y a une forte preuve statistique que tes données contiennent des outliers."
+"0",""
+"0","#residual vs. predicted : on ne doit pas distinguer de structures particulières doivent être distribué aléatoirement (indépendance des résidus)"
+"0",""
+"0","#### Test de dispersion seul"
+"0","testDispersion(Res)"
+"1","
+	DHARMa nonparametric dispersion test via sd of residuals fitted vs. simulated
+
+data:  simulationOutput
+dispersion = 1.0134, p-value = 0.68
+alternative hypothesis: two.sided
+
+"

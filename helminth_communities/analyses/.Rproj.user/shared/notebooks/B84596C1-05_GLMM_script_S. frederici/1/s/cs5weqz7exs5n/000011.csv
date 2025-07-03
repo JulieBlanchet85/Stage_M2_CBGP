@@ -1,0 +1,3 @@
+"2","G1;Erreur dans emmeans::emmeans(ModelSelected_intensite_glmm, pairwise ~ habitat1,  : 
+  No variable named habitat1 in the reference grid
+g"

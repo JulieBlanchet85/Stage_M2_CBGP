@@ -1,0 +1,2 @@
+"0","# Colonne qui combine syphacia ceacum et syphacia post"
+"0","t$syphacia <- t$syphacia_post + t$syphacia_caecum + t$syphacia_ant"

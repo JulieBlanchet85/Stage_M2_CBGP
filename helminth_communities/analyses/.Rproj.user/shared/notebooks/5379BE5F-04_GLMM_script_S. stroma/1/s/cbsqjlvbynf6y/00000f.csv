@@ -1,0 +1,44 @@
+"0","## Présence_absence"
+"0","summary(ModelSelected_pres_abs_glmm) "
+"1","Generalized linear mixed model fit by maximum likelihood (Laplace Approximation) ['glmerMod']
+ Family: binomial  ( logit )
+Formula: syphacia_stroma ~ habitat1 + sexe + (1 | numero_ligne)
+   Data: t_pres_abs
+Control: glmerControl(optCtrl = list(maxfun = 20000))
+
+      AIC       BIC    logLik -2*log(L)  df.resid 
+    142.2     156.0     -66.1     132.2       110 
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-1.3527 -0.6494 -0.4568  0.8587  2.1431 
+
+Random effects:
+ Groups       Name        Variance Std.Dev.
+ numero_ligne (Intercept) 0.1191   0.3451  
+Number of obs: 115, groups:  numero_ligne, 39
+
+Fixed effects:
+             Estimate Std. Error z value Pr(>|z|)  
+(Intercept)   -0.1679     0.5247  -0.320   0.7489  
+habitat1haie  -1.3784     0.5724  -2.408   0.0160 *
+habitat1pins  -0.7077     0.7862  -0.900   0.3681  
+sexeM          0.7651     0.4426   1.729   0.0839 .
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Correlation of Fixed Effects:
+            (Intr) hbtt1h hbtt1p
+habitat1hai -0.757              
+habitat1pns -0.534  0.590       
+sexeM       -0.391 -0.074 -0.123
+"
+"0","# Compare les modalités donc si plus que deux ne fait pas toutes les comparaisons mais juste avec celui qui est le plus en haut dans ordre alphabétique"
+"0","# Si estimate est -qqch pour sexeM ça veut dire que les mâles ont une charge + faible que les femelles"
+"0","# Si estimate ICP est positif veut dire que meilleur état corporel est lié à une augmentation de la charge parasitaire"
+"0","# Si estimate IgA est positif veut dire que un niveau + élevé d'IgA est associé à une charge parasitiare +  élevée"
+"0",""
+"0",""
+"0","###### AVEC MODELE COMPLET"
+"0","#summary(glmm_pres_abs) "
+"0",""

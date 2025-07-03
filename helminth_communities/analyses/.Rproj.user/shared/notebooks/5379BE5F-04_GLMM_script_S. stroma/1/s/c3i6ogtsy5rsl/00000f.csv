@@ -1,0 +1,20 @@
+"0","## Presence-absence"
+"0","ModelSelected_pres_abs_glmm<-glmer(syphacia_stroma~habitat1+(1|numero_ligne),data=t_pres_abs,family=binomial(link=""logit""),na.action=""na.fail"",control=glmerControl(optCtrl=list(maxfun=20000))) "
+"0",""
+"0","overdisp.glmer(ModelSelected_pres_abs_glmm) # fonctionne qu'avec GLMM"
+"1","Residual deviance: 132.779 on 111 degrees of freedom (ratio: 1.196)
+"
+"0","check_overdispersion(ModelSelected_pres_abs_glmm)"
+"1","[34m# Overdispersion test
+
+[39m dispersion ratio = 1.015
+          p-value = 0.864
+
+"
+"2","G3;No overdispersion detected.
+g"
+"0","#Si message boundary fit ça veut dire que pas d'effets de l'effet aléatoire donc on peut passer a un GLM ou pas"
+"0","# Le ratio c'est la dispersion donc on peut voir si sur ou sous dispersion"
+"0",""
+"0","### AVEC MODELE COMPLET"
+"0","#overdisp.glmer(glmm_pres_abs)"

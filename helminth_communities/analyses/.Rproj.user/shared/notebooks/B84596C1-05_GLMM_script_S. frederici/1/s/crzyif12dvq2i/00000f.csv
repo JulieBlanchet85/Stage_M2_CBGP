@@ -1,0 +1,2 @@
+"0","#Enlever individus qui ont plus de 200 syphacia_frederici"
+"0","t_infectes <- subset(t_infectes, syphacia_frederici < 150)"

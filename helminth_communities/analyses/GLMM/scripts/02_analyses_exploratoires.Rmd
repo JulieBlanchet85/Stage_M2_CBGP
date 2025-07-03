@@ -1,0 +1,478 @@
+---
+title: "Exploration du parasitisme chez les mulots"
+author: "Analyse exploratoire R"
+output: html_document
+---
+
+# Analyses exploratoires
+
+## 📦 Chargement des packages
+
+```{r, include = FALSE}
+library(tidyverse)
+library(vegan)
+library(FactoMineR)
+library(factoextra)
+library(cooccur)
+library(igraph)
+library(vegan)
+library(reshape2)
+library(ggplot2)
+library(ggcorrplot)
+```
+
+## 📄 Chargement des données
+
+```{r}
+df <-read.csv(here::here("data/derived_data/20250522_jd_complet.csv"), sep = ",")
+
+# Séparation des blocs de données
+parasites <- df[, c("syphacia_stroma", "heligmosomoides_polygyrus", "hymenolepis_hiberna","syphacia_frederici","hydatigera_parva","aspiculuris_tetraptera","skrjabinotaenia_lobata", "trichuris")]
+infos <- df[, c("demogroup","sexe", "SMI", "poids", "longueur_tete_corps", "richesse_spe_AP", "habitat1", "habitat2")]
+```
+
+## Plot distribution des helminthes
+
+```{r}
+df_long <- parasites %>%     
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") %>%
+  filter(variable %in% c("heligmosomoides_polygyrus", "syphacia_stroma", "syphacia_frederici"))
+
+
+# pour mettre les données au format long donc pour que une ligne ne représente plus un individu, une ligne c'est la valeur d'une varaible pour un individu, don pour chaque individus on va avoir plusieurs ligne, une par variable
+
+# On trace les histogrammes
+ggplot(data = df_long, aes(x = value)) +
+  geom_histogram(fill = '#69b3a2', color = 'white', bins = 30) +
+  facet_wrap(~ variable, scales = "free") +
+  theme_minimal()
+```
+
+## Prévalences des helminthes
+
+```{r}
+##Prévalence de chaque parasite
+prevalence <- colSums(parasites > 0) / nrow(parasites) * 100
+prevalence
+
+## % d'infectés par au - 1 parasite
+prevalence_globale <- sum(rowSums(parasites > 0) > 0) / nrow(parasites) * 100
+prevalence_globale
+```
+
+```{r}
+## Prévalence par habitat
+# Séparer les données par habitat
+parasites_par_habitat <- split(parasites, df$habitat1)
+
+# Calculer la prévalence pour chaque parasite dans chaque habitat
+prevalence_par_habitat <- lapply(parasites_par_habitat, function(x) {
+  colSums(x > 0) / nrow(x) * 100
+})
+
+prevalence_par_habitat # en %
+```
+
+```{r}
+## Test si différences significatives de prévalence entre les habitats 
+
+# Test exact de Fisher pour chaque parasite
+resultats_fisher <- lapply(names(parasites), function(parasite) {
+  table_contingence <- table(df$habitat1, df[[parasite]] > 0)
+  
+  # Test de Fisher
+  test <- fisher.test(table_contingence)
+  
+  data.frame(
+    Parasite = parasite,
+    P_value = test$p.value
+  )
+})
+
+# Rassembler les résultats
+resultats_df <- do.call(rbind, resultats_fisher)
+
+# Correction FDR
+resultats_df$P_value_holm <- p.adjust(resultats_df$P_value, method = "holm")
+
+# Affichage
+print(resultats_df)
+
+
+```
+
+```{r}
+## Comparaisons des prévalence pour S. frederici selon les habitats
+df$infected <- df$syphacia_frederici > 0
+# Obtenir les habitats
+habitats <- unique(df$habitat1)
+
+# Comparaisons deux à deux avec Fisher
+pairwise_fisher <- combn(habitats, 2, function(pair) {
+  # Sous-ensemble des données pour les deux habitats
+  subset_data <- df[df$habitat1 %in% pair, ]
+  
+  # Tableau de contingence
+  table_test <- table(subset_data$habitat1, subset_data$infected)
+  
+  # Test exact de Fisher
+  test <- fisher.test(table_test)
+  
+  # Résultat
+  data.frame(
+    Habitat1 = pair[1],
+    Habitat2 = pair[2],
+    P_value = test$p.value
+  )
+}, simplify = FALSE)
+
+# Combine les résultats
+pairwise_df <- do.call(rbind, pairwise_fisher)
+
+# Correction FDR
+pairwise_df$P_value_adj <- p.adjust(pairwise_df$P_value, method = "fdr")
+
+# Affichage
+print(pairwise_df)
+
+```
+
+```{r}
+## Plot
+prevalence_plot_data <- df %>%
+  mutate(infected = syphacia_frederici > 0) %>%
+  group_by(habitat1) %>%
+  summarise(
+    n = n(),
+    infected_n = sum(infected),
+    prevalence = infected_n / n * 100
+  )
+
+
+ggplot(prevalence_plot_data, aes(x = habitat1, y = prevalence)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_text(aes(label = paste0(round(prevalence, 1), "%")), vjust = -0.5) +
+  ylim(0, 100) +
+  labs(
+    title = "Prévalence de Syphacia frederici par habitat",
+    x = "Habitat",
+    y = "Prévalence (%)"
+  ) +
+  theme_minimal()
+
+```
+
+## Intensité d'infection des helminthes
+
+```{r}
+parasite_names <- c(
+  "syphacia_stroma", "heligmosomoides_polygyrus", "hymenolepis_hiberna",
+  "syphacia_frederici", "hydatigera_parva", "aspiculuris_tetraptera",
+  "skrjabinotaenia_lobata", "trichuris"
+)
+
+# Stockage des résultats
+kruskal_results <- list()
+
+for (parasite in parasite_names) {
+  # Filtrer que les infectés
+  df_infectes <- df %>%
+    filter(.data[[parasite]] > 0)
+  
+  # Vérifier qu'il y a au moins 2 habitats avec des infectés
+  if (length(unique(df_infectes$habitat1)) >= 2) {
+    # Kruskal-Wallis
+    kw <- kruskal.test(df_infectes[[parasite]] ~ df_infectes$habitat1)
+    
+    # Stocker les résultats
+    kruskal_results[[parasite]] <- data.frame(
+      Parasite = parasite,
+      N_infectes = nrow(df_infectes),
+      P_value = kw$p.value
+    )
+  } else {
+    kruskal_results[[parasite]] <- data.frame(
+      Parasite = parasite,
+      N_infectes = nrow(df_infectes),
+      P_value = NA
+    )
+  }
+}
+
+# Rassembler les résultats
+kruskal_df <- do.call(rbind, kruskal_results)
+
+# Correction FDR
+kruskal_df$P_value_adj <- p.adjust(kruskal_df$P_value, method = "holm")
+
+print(kruskal_df)
+```
+
+## Corrélations
+
+```{r}
+vars <- df[, c("SMI", "poids", "richesse_spe_AP")]
+cor_matrix <- cor(vars, use = "pairwise.complete.obs", method = "spearman")
+print(cor_matrix)
+```
+
+```{r}
+# Fonction pour extraire les p-values de cor.test
+cor_pmat <- function(x) {
+  n <- ncol(x)
+  p.mat <- matrix(NA, n, n)
+  colnames(p.mat) <- rownames(p.mat) <- colnames(x)
+  
+  for (i in 1:n) {
+    for (j in 1:n) {
+      test <- cor.test(x[, i], x[, j])
+      p.mat[i, j] <- test$p.value
+    }
+  }
+  return(p.mat)
+}
+
+p_matrix <- cor_pmat(vars)
+print(p_matrix)
+```
+
+```{r}
+# Heatmap avec significativité
+ggcorrplot::ggcorrplot(cor_matrix, method = "square", type = "lower",
+           lab = TRUE, lab_size = 4,
+           p.mat = p_matrix, sig.level = 0.05,
+           insig = "blank", colors = c("#6D9EC1", "grey", "#E46726"))
+```
+
+## Indices de diversité
+
+### Richesse spécifique en helminthe des mulots
+
+```{r}
+## Richesse spécifique par habitat
+vecteur_parasites <- c("syphacia_stroma", "heligmosomoides_polygyrus", "hymenolepis_hiberna","syphacia_frederici","hydatigera_parva","aspiculuris_tetraptera","skrjabinotaenia_lobata", "trichuris")
+
+### Convertir en présence/absence (1 = présent, 0 = absent)
+df2 <- df
+df2 <- df2 %>%
+  mutate(across(all_of(vecteur_parasites), ~ ifelse(. > 0, 1, 0)))
+
+### Calcul de la richesse spécifique par habitat1
+richesse_par_habitat <- df2 %>%
+  group_by(habitat1) %>%
+  summarise(richesse = sum(colSums(across(all_of(vecteur_parasites))) > 0))
+
+print(richesse_par_habitat)
+```
+
+```{r}
+## Richesse spécifique calculé pour chaque individu
+
+### Plot richesse spécifique en fonction des habitats 
+df$richesse <- rowSums(parasites > 0)
+
+ggplot(df, aes(x = richesse, fill = habitat1)) +
+  geom_histogram(bins = 15, position = "dodge") +
+  theme_minimal()
+
+ggplot(df, aes(x = richesse, fill = habitat2)) +
+  geom_histogram(bins = 15, position = "dodge") +
+  theme_minimal()
+
+### Test de Kruskal-Wallis
+kruskal.test(richesse ~ habitat1, data = df) #🔴 Pas de différences significatives
+kruskal.test(richesse ~ habitat2, data = df) #🔴 Pas de différences significatives
+```
+
+### Pourcentage de mulots en fonction richesse spécifique
+
+```{r}
+## Pourcentage de mulots infectés par une, deux trois, ... espèce
+table(df$richesse)
+df %>%
+  count(richesse) %>%
+  mutate(pourcentage = 100 * n / sum(n)) -> richesse_pourcent
+
+richesse_pourcent
+
+ggplot(richesse_pourcent, aes(x = as.factor(richesse), y = pourcentage)) +
+  geom_col(fill = "steelblue") +
+  labs(x = "Nombre d'espèces infectantes",
+       y = "Pourcentage de mulots infectés") +
+  theme_minimal()
+```
+
+### Indice de Shannon + piélou
+
+```{r}
+## Indice de Shannon, de Piélou et de Simpson totaux
+parasite_data <- df[, c("syphacia_stroma",
+                        "heligmosomoides_polygyrus",
+                        "hymenolepis_hiberna",
+                        "syphacia_frederici",
+                        "trichuris",
+                        "hydatigera_parva",
+                        "aspiculuris_tetraptera",
+                        "skrjabinotaenia_lobata")]
+total_abundances <- colSums(parasite_data)
+shannon_global <- vegan::diversity(total_abundances, index = "shannon")
+shannon_global
+pielou <- shannon_global / log(length(total_abundances))
+pielou
+simpson_global <- vegan::diversity(total_abundances, index = "simpson")
+simpson_global
+```
+
+```{r}
+## Indice de Shannon pour chaque habitat
+#Cet indice prend en compte lors de son calcul la richesse et l’abondance relative des espèces contrairement à la richesse spécifique.
+# L’indice H de Shannon varie donc en fonction du nombre d’espèce et de la proportion relative de ces différentes espèces. H vaudra 0 quand l’échantillon ne contient qu’une seule espèce et augmente lorsque le nombre d’espèce augmente. Plus l’indice H est élevé, plus la diversité est grande. H sera maximal et vaudra log(S) quand toutes les espèces sont également représentées.S =richesse spé
+
+table_abondance <- df %>%      # Création table somme des  abondances par habitat1
+  group_by(habitat1) %>%
+  summarise(across(all_of(vecteur_parasites), sum))
+
+mat_parasites <- as.data.frame(table_abondance[, -1]) # tableau sans habitat1
+rownames(mat_parasites) <- table_abondance$habitat1
+
+ind_shannon <- vegan::diversity(mat_parasites, index = "shannon") # Calcul indice
+mat_parasites$shannon_index <- ind_shannon
+
+## Indice de Pielou
+#Permet de mesurer la répartition des individus au sein des espèce. La valeur de l’indice d’équitabilité de Piélou (J) varie entre 0 et 1 où 0 correspond à la dominance d’une des espèces et 1 à l’équirépartition des individus entre les différentes espèces.
+mat_parasites$pielou_index <- mat_parasites$shannon_index / log(richesse_par_habitat$richesse)
+
+print(mat_parasites)
+```
+
+```{r}
+## Indice de Shannon calculé pour chaque individu
+### Enlever les lignes où y a aucun parasites
+
+df3 <- df %>% filter(richesse > 0) 
+
+### Calcul Shannon
+parasites <- df3[, c("syphacia_stroma", "heligmosomoides_polygyrus", "hymenolepis_hiberna","syphacia_frederici","hydatigera_parva","aspiculuris_tetraptera","skrjabinotaenia_lobata", "trichuris")]
+
+df3$shannon <- vegan::diversity(parasites, index = "shannon")
+
+ggplot2::ggplot(df3, aes(x = shannon, fill = habitat1)) +
+  geom_histogram(bins = 15, position = "dodge") +
+  theme_minimal()
+
+ggplot(df3, aes(x = shannon, fill = habitat2)) +
+  geom_histogram(bins = 15, position = "dodge") +
+  theme_minimal()
+
+# Test de Kruskal-Wallis 
+kruskal.test(shannon ~ habitat1, data = df3) #🔴 Pas de différences significatives
+kruskal.test(shannon ~ habitat2, data = df3) #🔴 Pas de différences significatives
+```
+
+```{r}
+## Indice d'équitabilité de Piélou
+#Permet de mesurer la répartition des individus au sein des espèce. La valeur de l’indice d’équitabilité de Piélou (J) varie entre 0 et 1 où 0 correspond à la dominance d’une des espèces et 1 à l’équirépartition des individus entre les différentes espèces.
+df4 <- df3 %>% filter(shannon > 0) 
+df4$pielou <- df4$shannon / log(df4$richesse)
+
+ggplot2::ggplot(df4, aes(x = pielou, fill = habitat1)) +
+  geom_histogram(bins = 15, position = "dodge") +
+  theme_minimal()
+
+### Kruskal-Wallis
+kruskal.test(pielou ~ habitat1, data = df4) #🔴 Pas de différences significatives
+kruskal.test(pielou ~ habitat2, data = df4) #🔴 Pas de différences significatives
+```
+
+### Indice de Simpson
+
+```{r}
+## Indice de Simpon pour chaque habitat
+# Mesure la probabilité que deux individus tirés au hasard à partir d’un échantillon appartiennent à la même espèce. Avec cet indice, on donne plus de poids aux espèces abondantes par rapport aux espèces rares. Dès lors, l’ajout d’une espèce rare à un échantillon ne modifiera pratiquement pas la valeur de l’indice de diversité.
+# Cet indice tend donc vers 0 lorsque la diversité est minimale et vers 1−(1/richesse spé) lorsque la diversité est maximale
+
+
+# Calcul indice sous forme 1-indice de simpson comme ça plus ça se rapproche de 1 plus la diversité est grande plus c'est proche de 0 bah moins y a de diversité ATTENTION vegan calcule la forme 1-D par défaut donc pas besoin de corriger
+ind_simpson <- vegan::diversity(mat_parasites[,c(1:8)], index = "simpson") 
+
+mat_parasites$simpson_index <- ind_simpson
+mat_parasites
+```
+
+```{r}
+## Indice de Simpson calculé pour chaque individu
+df3$simpson <- vegan::diversity(parasites, index = "simpson")
+
+ggplot(df3, aes(x = simpson, fill = habitat1)) +
+  geom_histogram(bins = 15, position = "dodge") +
+  theme_minimal()
+
+ggplot(df3, aes(x = simpson, fill = habitat2)) +
+  geom_histogram(bins = 15, position = "dodge") +
+  theme_minimal()
+
+# Test de Kruskal-Wallis 
+kruskal.test(simpson ~ habitat1, data = df3) #🔴 Pas de différences significatives
+kruskal.test(simpson ~ habitat2, data = df3) #🔴 Pas de différences significatives
+```
+
+## Comparaisons
+
+```{r}
+## Completer df avec données df3
+df <- df %>%
+  left_join(df3, by = c("code_rongeur","syphacia_stroma", "heligmosomoides_polygyrus", "hymenolepis_hiberna","syphacia_frederici","hydatigera_parva","aspiculuris_tetraptera","skrjabinotaenia_lobata", "trichuris","numero_ligne","demogroup","sexe", "SMI", "poids", "longueur_tete_corps", "richesse_spe_AP", "habitat1", "habitat2","richesse"))%>%
+  left_join(df4, by = c("code_rongeur","syphacia_stroma", "heligmosomoides_polygyrus", "hymenolepis_hiberna","syphacia_frederici","hydatigera_parva","aspiculuris_tetraptera","skrjabinotaenia_lobata", "trichuris","numero_ligne","demogroup","sexe", "SMI", "poids", "longueur_tete_corps", "richesse_spe_AP", "habitat1", "habitat2","richesse","shannon"))
+
+```
+
+```{r}
+wilcox.test(richesse ~ sexe, data = df)
+kruskal.test(richesse ~ habitat1, data = df)
+kruskal.test(richesse ~ habitat2, data = df)
+kruskal.test(shannon ~ habitat1, data = df)
+kruskal.test(shannon ~ sexe, data = df)
+kruskal.test(simpson ~ habitat1, data = df)
+kruskal.test(simpson ~ sexe, data = df)
+kruskal.test(SMI ~ habitat1, data = df)
+```
+
+### Différences significatives du poids entre habitats
+
+```{r}
+kruskal.test(poids ~ habitat1, data=df) #🔴 significatif
+
+pairwise.wilcox.test(df$poids,df$habitat1,p.adjust.method = "holm",paired = FALSE)
+```
+
+```{r}
+by(df$poids, df$habitat1, summary)
+```
+
+```{r}
+boxplot(poids ~ habitat1, data = df, 
+        main = "Poids des mulots par habitat",
+        xlab = "Habitat", 
+        ylab = "Poids")
+```
+
+### Différences significatives de la richesse spécifique est AP (hors helminthes) en fonction du paysage
+
+```{r}
+kruskal.test(richesse_spe_AP ~ habitat1, data = df)
+```
+
+```{r}
+pairwise.wilcox.test(df$richesse_spe_AP,df$habitat1,p.adjust.method = "holm",paired = FALSE)
+```
+
+```{r}
+by(df$richesse_spe_AP, df$habitat1, summary)
+```
+
+```{r}
+boxplot(richesse_spe_AP ~ habitat1, data = df, 
+        main = "Poids des mulots par habitat",
+        xlab = "Habitat", 
+        ylab = "Poids")
+```

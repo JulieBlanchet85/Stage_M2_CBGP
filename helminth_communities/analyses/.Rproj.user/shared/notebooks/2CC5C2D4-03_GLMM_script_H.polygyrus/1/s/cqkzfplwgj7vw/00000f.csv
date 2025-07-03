@@ -1,0 +1,7 @@
+"0","# Distribution intenisté"
+"0","#Graph 1"
+"0","plot(t_infectes$heligmosomoides_polygyrus, 1:nrow(t_infectes),"
+"0","     xlab = ""Nombre d'heligmosomoides polygyrus"","
+"0","     ylab = ""Index des rongeurs"","
+"0","     main = ""Nuage de points : distribution d'heligmosomoides polygyrus"","
+"0","     pch = 19, col = ""blue"")"

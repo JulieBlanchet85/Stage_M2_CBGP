@@ -1,0 +1,9 @@
+"0","## Intensité"
+"0","MuMIn::r.squaredGLMM(ModelSelected_intensite_glmm)"
+"2","G1;Erreur : objet 'ModelSelected_intensite_glmm' introuvable
+Erreur pendant l'emballage (wrapup) : il n'y a pas autant de trames dans la pile
+Erreur : plus de gestionnaire d’erreur disponible (erreurs récursives ?) ; appel d’un redémarrage de type 'abort'
+g"
+"0","#R2m = part de la varaince expliquée par les effets fixes "
+"0","#R2c = part de la variance expliquée par effets fixes + aléatoires"
+"0","#Donne % de la variance expliquée par le modèle"

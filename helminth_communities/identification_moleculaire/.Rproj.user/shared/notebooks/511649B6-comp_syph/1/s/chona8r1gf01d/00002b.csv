@@ -1,0 +1,4 @@
+"0",""
+"0","# Par exemple, pour voir uniquement ceux avec plusieurs espèces différentes :"
+"0","plusieurs_esp <- filter(esp_par_individu, multiple_esp == TRUE)"
+"0","print(plusieurs_esp)"

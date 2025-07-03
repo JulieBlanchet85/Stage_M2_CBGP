@@ -1,0 +1,18 @@
+"0","##Presence-absence"
+"0","MuMIn::r.squaredGLMM(ModelSelected_pres_abs_glmm)"
+"2","G2;H2;Avis h: the null model is only correct if all the variables it uses are identical 
+to those used in fitting the original model.g
+"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"1","                   R2m        R2c
+theoretical 0.02451062 0.03441374
+delta      "
+"1"," 0.02016238 0.02830867
+"
+"0","#R2m = part de la varaince expliquée par les effets fixes "
+"0","#R2c = part de la variance expliquée par effets fixes + aléatoires"
+"0","#Donne % de la variance expliquée par le modèle"
+"0",""
+"0","#### AVEC MODELE COMPLET"
+"0","#MuMIn::r.squaredGLMM(glmm_pres_abs)"

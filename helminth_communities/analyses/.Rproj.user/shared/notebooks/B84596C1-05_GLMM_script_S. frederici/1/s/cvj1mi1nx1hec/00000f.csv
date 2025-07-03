@@ -1,0 +1,21 @@
+"0","## Intensité"
+"0","SelectionModels_intensite_glmm<-MuMIn::dredge(glmm_intensite,rank = ""AICc"")"
+"2","G3;Fixed term is ""(Intercept)""
+g"
+"0","TopModels_intensite_glmm<-subset(SelectionModels_intensite_glmm,delta<2) "
+"0","TopModels_intensite_glmm"
+"1","Global model call: "
+"1","glmer(formula = syphacia_frederici ~ sexe + poids_z + SMI_z + 
+    habitat1 + richesse_spe_AP_z + (1 | numero_ligne), data = t_infectes, 
+    family = poisson(link = ""log""), control = glmerControl(optimizer = ""bobyqa"", 
+        optCtrl = list(maxfun = 20000)), na.action = ""na.fail"")
+---
+Model selection table 
+     (Int) hb1  pds_z rch_spe_AP_z sex SMI_z df   logLik  AICc delta weight
+31  0.4946     0.8807      -0.6678   + 1.187  6 -311.667 638.0  0.00    0.6
+32 -1.3010   + 0.9152      -0.6927   + 1.226  8 -308.944 638.9  0.81    0.4
+Models ranked by AICc(x) 
+Random terms (all models): 
+  1 | numero_ligne
+
+"

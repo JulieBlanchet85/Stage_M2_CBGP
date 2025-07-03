@@ -1,0 +1,397 @@
+---
+title: "Analysis BioRodDis data"
+author: "Vincent Sluydts"
+institute: "University of Antwerp"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(Hmsc) #depends on package coda!
+library(corrplot)
+library(colorspace)
+library(vioplot)
+library(GGally)
+library(writexl)
+library(ggplot2)
+library(PerformanceAnalytics)
+library(grid)
+library(gridExtra)
+
+```
+
+
+---
+# INPUT DATA
+
+Always good practice to start with an empty, clean work space:
+
+```{r}
+rm(list = ls()); gc()
+```
+
+Read in the data files needed for the analysis
+```{r}
+#read in  the bioroddis data file (rds format) and the information on pathogen associated traits (csv)
+dat<-readRDS("./data/bioroddis.rds")
+#dat<-readRDS("./data/all11.rds")
+trait <- read.csv(file="./data/disease_traits.csv", sep=",", row.names = 1)
+
+```
+
+
+## pathogens names 
+
+Here we combine the different strains for the analysis to have genus level pathogen info per specimen
+
+```{r}
+dat$Borrelia <- ifelse((dat$Borrelia_1+dat$Borrelia_2) > 0, 1,0)  
+dat$Mycoplasma_ravipulmonis <- ifelse((dat$Mycoplasma_ravipulmonis_1 + dat$Mycoplasma_ravipulmonis_2) >0, 1, 0)
+dat$Chlamydia <- ifelse((dat$Chlamydia_1+dat$Chlamydia_2) > 0, 1,0)
+dat$Rickettsia <- ifelse((dat$Rickettsia_1+dat$Rickettsia_2) > 0, 1,0)
+dat$Streptobacillus <- ifelse((dat$Streptobacillus_1 + dat$Streptobacillus_2)> 0, 1,0)
+dat$Hanta <- ifelse((dat$IFA_PUUV +dat$IFA_DOBRV)> 0, 1,0)
+dat$Lepto <- ifelse((dat$lepto.lipl32 + dat$Leptospira)>0, 1, 0)
+```
+
+```{r}
+names(dat)
+```
+
+```{r}
+disease.names <- c("Bartonella","Mycoplasma_haemo","Mycoplasma_coco",  "Candidatus_Neoehrlichia",   "Anaplasma"    , "Francisella", "Borrelia"  ,  "Orientia" ,   "Sarcocystidae" , "Mycoplasma_penetrans", "Mycoplasma_ravipulmonis" , "Mycoplasma_microti", "Mycoplasma_insons"  , "Ehrlichia" ,   "Chlamydia"     ,  "Rickettsia"   ,  "Leptospira"  ,   "Streptobacillus",  "IFA_POX" ,"Hanta" , "IFA_LCMV" , "Lepto")  
+
+#extract columns with pathogens of interest screened
+diseases <- dat[names(dat) %in% disease.names]
+```
+
+
+## Overal pathogen prevalence
+
+```{r}
+cbind(colSums(diseases, na.rm=T), round((colSums(diseases, na.rm=T)/nrow(diseases))*100, 2)) -> dis.prev
+dis.prev <- as.data.frame(dis.prev)
+colnames(dis.prev)<- c("positive", "prevalence")
+dis.prev[order(dis.prev$positive),]
+
+```
+
+Pathogens with over 50 positive occurrences are considered for further analysis
+
+```{r}
+dis.prev[dis.prev$positive>50,]
+```
+
+
+Host species diversity per country
+
+
+```{r}
+
+names(dat)
+
+cbind(dat %>% filter(Country == 'Belgium') %>% dplyr::select(Species) %>% table(),
+dat %>% filter(Country == 'France') %>% dplyr::select(Species) %>% table(),
+dat %>% filter(Country == 'Germany') %>% dplyr::select(Species) %>% table(),
+dat %>% filter(Country == 'Ireland') %>% dplyr::select(Species) %>% table(),
+dat %>% filter(Country == 'Poland') %>% dplyr::select(Species) %>% table()) -> soorten
+
+soort <- as.data.frame(soorten)
+colnames(soort) <- c("Belgium","France", "Germany", "Ireland", "Poland")
+soort
+```
+
+
+Setting the stage for the HMSC analysis
+
+```{r}
+#dat %>% filter(Country != 'Poland') -> dat2 #as there was only one habitat sampled and not all samples from Poland were tested for all diseases, Poland is left out of the HMSC analysis.
+dat %>% filter((Genus == "Apodemus" | Genus == "Myodes" ) & SpatTemp != "BEPFO6_Winter_2020" & Site_Code != "GEFKAT" & Site_Code != "GEFKIR"& Country != 'Poland') %>% droplevels()-> dat2
+
+#Here we omit the data from Poland as we did not have IFA and Leptospirosis tested, as well as fieldwork in one locality [habitat], season/year only.
+#Two German sites, GEFKAT and GEFKIR were omitted for sampling only once as well, after it was decided to move to sites where rodents were more abundant. Only 6 rodents were trapped in those sites. 
+#BEPFO6 is an additional sampling behind a bird cage at university. Two rats were trapped and omitted from the HMSC analysis as well.
+# droplevels() ensures no residual factor levels remain as this will generate error during model runs
+
+
+
+patho<-c("Bartonella","Mycoplasma_haemo", "Mycoplasma_coco","IFA_POX","Sarcocystidae","Candidatus_Neoehrlichia" ,"Hanta", "Borrelia","Lepto", "Anaplasma" ,"Francisella") #pathogens with over 50 occurences
+
+host <- c("Sex", "Weight","Maturity", "Richness_gut_species", "lrich") 
+
+envir <- c("grass","f.broad", "f.coni", "w.perm","w.temp", "hab2", "hab3", "HSD" )
+clim <- c("total_rain","max_temp1",  "min_temp1")
+tijd<- c("Season", "Year")
+anthro <- c("imper", "pop", "HFI")
+covariates <- c(host, envir, clim, anthro, tijd)
+
+
+randomeffects<-c("Id_code","Species","Genus" ,"Site_Code", "Period", "SpatTemp", "Country")
+
+
+needed<-c(covariates, randomeffects, patho)
+dat2 %>% dplyr::select(all_of(needed)) -> dat3
+head(dat3)
+
+```
+
+
+
+Check for NA values:
+
+```{r}
+dat3 %>%
+  summarise_all(funs(sum(is.na(.))))
+```
+```{r}
+dat3 %>% dplyr::select(all_of(needed)) %>% na.omit()-> dat4
+```
+
+Final check 
+```{r}
+dat4 %>% select(Species) %>% table()
+dat4 %>% select(Site_Code) %>% table()
+dat4 %>% select(SpatTemp) %>% table()
+
+dat4 %>% select(Season) %>% table()
+dat4 %>% select(Year) %>% table()
+dat4 %>% select(Period) %>% table()
+
+any(is.na(dat4))
+```
+# HMSC ANALYSIS -----
+
+---
+### STEP 1: Setup of Y and X matrices
+
+```{r}
+#Y matrix of HMSC diseases
+Y<-as.matrix(dat4[,names(dat4)%in%patho])
+colnames(Y)
+```
+
+--
+```{r}
+
+#COVARIATE STRUCTURE 
+
+host <- c("Sex", "Weight","Maturity", "Richness_gut_species", "lrich")
+envir <- c("grass","f.broad", "f.coni", "w.perm","w.temp", "hab2", "hab3", "HSD")
+clim <- c("total_rain","max_temp1",  "min_temp1")
+tijd<- c("Season", "Year")
+anthro <- c("imper", "pop", "HFI")
+covariates <- c(host, envir, clim, anthro, tijd)
+
+randomeffects<-c("Id_code","Genus","Species","Site_Code", "Period", "SpatTemp", "Country")
+
+X<-dat4[, names(dat4)%in%c(covariates, randomeffects)]
+colnames(X)
+```
+
+```{r}
+X %>% select('Id_code', 'Site_Code', 'Country', 'Sex', 'Weight', 'grass', 'max_temp1') %>% head()
+```
+
+
+---
+### Check Species/Pathogen Matrix:
+
+```{r}
+colnames(Y)
+# Check for absent (0) or ubiquitous species/pathogens (1).
+
+# Note that we have selected on those pathogens for which at least 50 occurrences were observed.
+
+colSums(Y)
+```
+
+---
+### STEP 2: Set the HMSC model structure
+
+
+#### Read in traits  
+```{r }
+
+TR<-trait
+
+TR$Detection <- as.factor(TR$Detection) #detection method: 16S, IFA or PCR
+TR$Transmission <- as.factor(TR$Transmission) #vector, environmental or direct as dominant transmission pathways
+TR$patho <- as.factor(TR$patho) #virus, bacteria, protozoa
+TR$domHost <- as.factor(TR$domHost) #dominant host, lously defined as the host in which the pathogen occured with highest prevalence
+
+
+TR <- TR[match(colnames(Y), rownames(TR)), ]
+TR
+
+```
+
+
+#### Fixed effects model structure
+```{r }
+## MODEL  ------
+names(X)
+
+XFormula0 = ~ hab2 #HABITAT
+
+XFormula1 = ~ Species + Sex + Weight + Maturity + lrich  #SPECIES + HOST CHARACTERISTICS [INT]
+
+XFormula2 = ~ grass + f.broad + f.coni + w.perm + w.temp + total_rain + min_temp1 + max_temp1 #ENVIRONMENTAL VARS + CLIMATE [EXT]
+
+XFormula3 = ~  HFI +  HSD + HFI:HSD #ANTHROPOGENIC FACTORS [ANT]
+
+XFormula4 = ~ Species + Sex + Weight + Maturity + lrich +  grass + f.broad + f.coni + w.perm + w.temp + total_rain + min_temp1 + max_temp1 + HFI + HSD #INT+EXT+ANTHRO
+
+```
+
+--
+#### Trait effect model structure
+
+```{r}
+#TrForm1    = ~ Transmission
+#for plotting perhaps easiest to remove intercept here
+TrForm1    = ~ -1 + Transmission
+```
+
+
+--
+#### Random effects model structure
+```{r }
+
+#Define the study design
+studyDesign = data.frame( Spat = dat4$Site_Code, Temp = dat4$Period)
+
+# Define Random level at time unit [season*year]
+rL.time = HmscRandomLevel(units = levels(studyDesign$Temp))
+# Define Random level at trap site unit
+rL.spatial = HmscRandomLevel(units = levels(studyDesign$Spat))
+
+
+```
+
+### Different models defined as in the table 1 from the paper
+
+```{r}
+
+BR0 = Hmsc(Y = Y, XData = X, XFormula = XFormula0, distr="probit", TrData = TR, TrFormula = TrForm1, studyDesign = studyDesign, ranLevels = list(Spat = rL.spatial,  Temp = rL.time))
+
+BR1 = Hmsc(Y = Y, XData = X, XFormula = XFormula1, distr="probit",  TrData = TR, TrFormula = TrForm1, studyDesign = studyDesign, ranLevels = list(Spat = rL.spatial,  Temp = rL.time))
+
+BR2 = Hmsc(Y = Y, XData = X, XFormula = XFormula2, distr="probit", TrData = TR, TrFormula = TrForm1, studyDesign = studyDesign, ranLevels = list(Spat = rL.spatial,  Temp = rL.time))
+
+BR3 = Hmsc(Y = Y, XData = X, XFormula = XFormula3, distr="probit",  studyDesign = studyDesign,TrData = TR, TrFormula = TrForm1, ranLevels = list(Spat = rL.spatial,  Temp = rL.time))
+
+BR4 = Hmsc(Y = Y, XData = X, XFormula = XFormula4, distr="probit",TrData = TR, TrFormula = TrForm1,  studyDesign = studyDesign, ranLevels = list(Spat = rL.spatial,  Temp = rL.time))
+
+```
+
+
+---
+## STEP 3: TESTRUN 
+
+```{r include=FALSE}
+
+#### TEST RUN
+nChains = 1
+test.run = TRUE
+if (test.run){
+#with this option, the vignette runs fast but results are not reliable
+thin = 1
+samples = 10
+transient = 5
+verbose = 0
+} else {
+#with this option, the vignette evaluates slow but it reproduces the results of the
+#pdf version
+thin = 10
+samples = 1000
+transient = 500*thin
+verbose = 0
+}
+```
+
+
+--
+#### Run MCMC samples
+
+```{r include = F, eval=T}
+
+EU0.test = sampleMcmc(BR0, thin = thin, samples = samples, transient = transient,
+               nChains = nChains)
+
+EU1.test = sampleMcmc(BR1, thin = thin, samples = samples, transient = transient,
+               nChains = nChains)
+
+EU2.test = sampleMcmc(BR2, thin = thin, samples = samples, transient = transient,
+               nChains = nChains)
+
+EU3.test = sampleMcmc(BR3, thin = thin, samples = samples, transient = transient,
+               nChains = nChains)
+
+EU4.test = sampleMcmc(BR4, thin = thin, samples = samples, transient = transient,
+               nChains = nChains)
+
+```
+
+---
+## STEP 4: SAVE INTO object for automatic running 
+
+Here we save all the information for running the models and this will be loaded in a script which can be run as a background job and uses different cores for each chain [see script: HMSC_run_models.R].
+
+```{r }
+# Place the models in a list together
+models = list(BR0, BR1, BR2, BR3, BR4)
+modelnames = c("HAB", "INT", "EXT", "ANT", "INT-EXT-ANT") # Give them the proper names
+```
+
+```{r }
+# Save the models in the model folder
+save(models, modelnames,file = paste('./models', 'unfitted_ALL', sep="/"))
+```
+
+After this object is read in using the script HMSC_run_models.R for sampling the chains in parallel over longer periods. Explanatory and predictive performance follow later on using the script HMSC_compute_model_fit.R. All these scripts follow the design proposed by the authors of the HMSC package. for more info check: 
+
+https://www.helsinki.fi/en/researchgroups/statistical-ecology/software/hmsc
+
+
+### SPLIT FOR CONVENIENCE DUE TO long runtimes
+
+Basically here we split the saved object and list one or two models, this makes it easier to run each one next to each other in the background.
+
+```{r }
+# Place the models in a list together
+models = list(BR0, BR1)
+modelnames = c("HAB", "INT") # Give them the proper names
+```
+
+```{r }
+# Save the models in the model folder
+save(models, modelnames,file = paste('./models', 'unfitted_BR01', sep="/"))
+```
+
+```{r }
+# Place the models in a list together
+models = list(BR2, BR3)
+modelnames = c("EXT", "ANT") # Give them the proper names
+```
+
+```{r }
+# Save the models in the model folder
+save(models, modelnames,file = paste('./models', 'unfitted_BR23', sep="/"))
+```
+
+
+
+```{r }
+# Place the models in a list together
+models = list(BR4)
+modelnames = c("INT-EXT-ANT") # Give them the proper names
+```
+
+```{r }
+# Save the models in the model folder
+save(models, modelnames,file = paste('./models', 'unfitted_BR4', sep="/"))
+```

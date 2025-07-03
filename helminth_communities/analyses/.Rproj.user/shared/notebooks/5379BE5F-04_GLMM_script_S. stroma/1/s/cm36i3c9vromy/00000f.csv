@@ -1,0 +1,20 @@
+"0","## Présence-absence"
+"0","drop1(ModelSelected_pres_abs_glmm,.~.,test=""Chisq"")"
+"1","Single term deletions
+
+Model:
+syphacia_stroma ~ habitat1 + (1 | numero_ligne)
+         npar    AIC    LRT Pr(Chi)  
+<none>        143.41                 
+habitat1    2 145.68 6.2668 0.04357 *
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+"
+"0","#ANOVA tient compte positions variables donc pas cool"
+"0","#drop 1 tient pas compte position variable dans code donc cool"
+"0","#df = nb modalité de la variable -1"
+"0","# LRT c'est la valuer de test"
+"0","#Test si effet significatif de la variable sur le modèle"
+"0",""
+"0","#### AVEC MODELE COMPLET"
+"0","#drop1(glmm_pres_abs,.~.,test=""Chisq"")"

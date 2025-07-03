@@ -1,0 +1,14 @@
+"0","##Calcul SMI"
+"0","fiche_dissection$SMI <- fiche_dissection$poids*(L0/fiche_dissection$longueur_tete_corps)^b_SMA"
+"0",""
+"0","mean(fiche_dissection$SMI)"
+"1","[1] 20.41967
+"
+"0","median(fiche_dissection$SMI)"
+"1","[1] 20.17897
+"
+"0","#🔴 moyenne SMI de 20.41967 quand b_SMA et LO calculé sans femelles gestantes"
+"0","#🔴 médiane SMI de 20.17897 quand b_SMA et LO calculé sans femelles gestantes"
+"0","#🔴 moyenne SMI de 20.712 quand b_SMA et LO calculé avec femelles gestantes"
+"0","#🔴 médiane SMI de 20.47779 quand b_SMA et LO calculé avec femelles gestantes"
+"0","#"

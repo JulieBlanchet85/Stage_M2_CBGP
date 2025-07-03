@@ -1,0 +1,230 @@
+---
+---
+---
+
+|                                       |
+|---------------------------------------|
+| title: "04_script_GLM_pour_apprendre" |
+| utput: html_document                  |
+
+# —————————————————————————
+
+# GLMM richesse parasitaire
+
+# —————————————————————————
+
+## Packages & datasets loading
+
+```{r}
+#install.packages(c("MuMIn","nlme","lme4", "MASS", "car", "RVAideMemoire", "DHARMa", "lmerTest","emmeans))
+
+library(nlme) 
+library(MuMIn) 
+library(lme4) 
+library(MASS) 
+library(car) 
+library(RVAideMemoire) 
+library(DHARMa) 
+library(lmerTest)
+library(dplyr)
+library(emmeans)
+library(ggplot2)
+library(glmmTMB)
+library(performance)
+library(car)
+```
+
+## Chargement
+
+```{r}
+t <-read.csv(here::here("GLMM/data/derived_data/20250522_jd_complet.csv"), sep = ",")
+
+t$habitat1=as.factor(t$habitat1)
+t$habitat2=as.factor(t$habitat2)
+```
+
+```{r}
+colonnes_parasites <- c("syphacia_stroma", "heligmosomoides_polygyrus", "hymenolepis_hiberna","syphacia_frederici","hydatigera_parva","aspiculuris_tetraptera","skrjabinotaenia_lobata", "trichuris")
+
+t$richesse <- rowSums(t[, colonnes_parasites] > 0, na.rm = TRUE)
+
+t %>%
+  dplyr::count(richesse>0)%>%
+  mutate(pourcentage = n / sum(n) * 100)
+```
+
+# GLMM
+
+Selon règle empirique, il faut minimum 10 observations par paramètres pour que la capacité d'estimation du GLM soit pas trop mauvaise. Sachant que v quati compte pour un paramètre chacune et que v quali compte K-1 paramètres, avec K nombre de modalités de la variable
+
+```{r}
+##### 
+
+t_infectes <- subset(t, richesse > 0)
+### Combien de fois chaque ligne
+table(t_infectes$numero_ligne)
+
+### Scale
+t_infectes$SMI_z <- scale(t_infectes$SMI)        
+t_infectes$richesse_spe_AP_z <- scale(t_infectes$richesse_spe_AP)
+t_infectes$poids_z <- scale(t_infectes$poids)
+
+
+
+```
+
+```{r}
+# Distribution intenisté
+#Graph 1
+plot(t_infectes$richesse, 1:nrow(t_infectes),
+     xlab = "Richesse spécifique parasitaire",
+     ylab = "Index des rongeurs",
+     main = "Nuage de points : distribution de la richesse spécifique parasitaire",
+     pch = 19, col = "blue")
+
+
+# Graph 2
+# Compter le nombre de rongeurs pour chaque nombre de richesse
+t_infectes_count <- t_infectes %>%
+  group_by(richesse) %>%
+  summarise(n_rongeurs = n())
+ggplot(t_infectes_count, aes(x = richesse, y = n_rongeurs)) +
+  geom_col(fill = "steelblue") +
+  labs(
+    x = "Richesse spécifique parasitaire",
+    y = "Nombre de rongeurs infectés",
+    title = "Distribution du nombre de la ichesse spécifique parasitaire"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+#Test en commepoisson car soudispersion avec poisson
+
+glmm_intensite <- glmmTMB::glmmTMB(richesse ~ sexe + poids_z + SMI_z + habitat1 + richesse_spe_AP_z + (1 | numero_ligne), data = t_infectes, family = compois(),na.action = na.fail)
+```
+
+## *Selection de modeles*
+
+```{r}
+## Intensité
+SelectionModels_intensite_glmm<-MuMIn::dredge(glmm_intensite,rank = "AICc")
+
+TopModels_intensite_glmm<-subset(SelectionModels_intensite_glmm,delta<2) 
+TopModels_intensite_glmm
+```
+
+## *Verification/validation du modèle choisi*
+
+Verifier si problème de dispersion des données --\> si oui, opter pour modèles quasi
+
+```{r}
+## Intensité
+ModelSelected_intensite_glmm <- glmmTMB::glmmTMB(richesse ~  poids_z +SMI_z+ (1 | numero_ligne), data = t_infectes, family = compois(),na.action = na.fail)
+
+performance::check_overdispersion(ModelSelected_intensite_glmm) # --> focntionne pour glmmTMB
+
+```
+
+Verification des residus (evaluer la qualite du modele)
+
+```{r}
+Res<-DHARMa::simulateResiduals(ModelSelected_intensite_glmm, n = 250, refit = F, integerResponse = NULL, plot = F, seed = 123) 
+plot(Res, rank = TRUE) 
+
+testDispersion(Res)
+testResiduals(Res)
+```
+
+## *Test du modele choisi + tests de significativite des variables*
+
+```{r}
+car::Anova(ModelSelected_intensite_glmm, type = 2)
+
+```
+
+## *Determiner sens des corrélations et différences entre modalités*
+
+### *Variables quantitatives et variables qualitatives à 2 modalités*
+
+```{r}
+## Intensité
+summary(ModelSelected_intensite_glmm) 
+```
+
+## *Pourcentage d'explication du modèle (proportion of variation explained by the model in total)*
+
+```{r}
+## Intensité
+MuMIn::r.squaredGLMM(ModelSelected_intensite_glmm)
+#R2m = part de la varaince expliquée par les effets fixes 
+#R2c = part de la variance expliquée par effets fixes + aléatoires
+#Donne % de la variance expliquée par le modèle
+```
+
+# Graphiques
+
+#### *Richesse spécifique en helminthes en fonction du poids*
+
+```{r}
+# Charge ggplot2 si ce n'est pas déjà fait
+library(ggplot2)
+
+# Graphique : poids en abscisse, richesse spécifique en ordonnée
+ggplot(data = t, aes(x = poids, y = richesse)) +
+  geom_point() +  # Points individuels
+  geom_smooth(method = "lm", se = TRUE, color = "darkgreen") +  # Régression linéaire
+  labs(
+    title = "Relation entre le poids de l'hôte et la richesse spécifique en helminthes",
+    x = "Poids de l'hôte",
+    y = "Richesse spécifique en helminthes"
+  ) +
+  theme_minimal()
+
+```
+
+#### *Richesse spécifique en helminthes en fonction du poids avec courbe prédite pas GLMM*
+
+```{r}
+# Créer une séquence de poids centrés-réduits (poids_z)
+new_data <- data.frame(
+  poids_z = seq(min(t_infectes$poids_z, na.rm = TRUE),
+                max(t_infectes$poids_z, na.rm = TRUE),
+                length.out = 100)
+)
+
+# Fixer les autres variables du modèle (SMI_z ici) à leur moyenne
+new_data$SMI_z <- 0  # moyenne de SMI_z (car centrée)
+new_data$numero_ligne <- NA  # pour ignorer l'effet aléatoire
+
+# Prédictions avec intervalle de confiance
+pred <- predict(ModelSelected_intensite_glmm, newdata = new_data, se.fit = TRUE, type = "response")
+
+# Ajouter les prédictions au data.frame
+new_data$richesse_pred <- pred$fit
+new_data$richesse_se <- pred$se.fit
+
+# Revenir à l'échelle originale du poids (si tu veux l'afficher sur l'axe x)
+mean_poids <- mean(t_infectes$poids, na.rm = TRUE)
+sd_poids <- sd(t_infectes$poids, na.rm = TRUE)
+new_data$poids <- new_data$poids_z * sd_poids + mean_poids
+
+##Graphique
+ggplot(data = t_infectes, aes(x = poids, y = richesse)) +
+  geom_point(alpha = 0.5) +
+  geom_line(data = new_data, aes(x = poids, y = richesse_pred), color = "darkgreen", linewidth = 1.2) +
+  geom_ribbon(data = new_data,
+              aes(x = poids,
+                  ymin = richesse_pred - 1.96 * richesse_se,
+                  ymax = richesse_pred + 1.96 * richesse_se),
+              inherit.aes = FALSE, fill = "darkgreen", alpha = 0.2) +
+  labs(
+    title = "Courbe prédite par le GLMM",
+    x = "Poids de l'hôte",
+    y = "Richesse spécifique"
+  ) +
+  theme_minimal()
+
+
+```

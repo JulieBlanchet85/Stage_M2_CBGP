@@ -1,0 +1,2 @@
+"0","fiche_dissection <- fiche_dissection %>%"
+"0","  left_join(autres_pathos, by = ""code_rongeur"")"

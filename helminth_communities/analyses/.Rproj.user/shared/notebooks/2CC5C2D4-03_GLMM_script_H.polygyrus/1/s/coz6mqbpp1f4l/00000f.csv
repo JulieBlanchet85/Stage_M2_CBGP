@@ -1,0 +1,24 @@
+"0","## Intensite"
+"0","#drop1(ModelSelected_intensite_glmm,.~.,test=""Chisq"")"
+"0",""
+"0","#### AVEC glmmTMB"
+"0",""
+"0","car::Anova(ModelSelected_intensite_glmm, type = 2)"
+"1","Analysis of Deviance Table (Type II Wald chisquare tests)
+
+Response: heligmosomoides_polygyrus
+"
+"1","           Chisq Df Pr(>Chisq)    
+habitat1 12.0719  2   0.002391 ** 
+poids_z  22.9079  1    1.7e-06 ***
+SMI_z     9.6029  1   0.001943 ** 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+"
+"0","#ModelSelected_intensite_glmm <- glmmTMB::glmmTMB(heligmosomoides_polygyrus ~ poids_z + SMI_z +habitat1+ (1 | numero_ligne), data = t_infectes,family = nbinom2, na.action = na.fail)"
+"0",""
+"0","#car::Anova(ModelSelected_intensite_glmm, type = 2)"
+"0",""
+"0","#ModelSelected_intensite_glmm <- glmmTMB::glmmTMB(heligmosomoides_polygyrus ~ SMI_z + habitat1+poids_z+ (1 | numero_ligne), data = t_infectes,family = nbinom2, na.action = na.fail)"
+"0",""
+"0","#car::Anova(ModelSelected_intensite_glmm, type = 2)"

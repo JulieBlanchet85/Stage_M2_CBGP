@@ -1,0 +1,291 @@
+---
+title: "GLMM Indices de diversité et richesse spécifique en helminthe"
+output: html_document
+---
+
+# Calculs des indices de diversité et de la richesse spécifique
+
+```{r, include= FALSE}
+library(tidyverse)
+library(vegan)
+library(FactoMineR)
+library(factoextra)
+library(cooccur)
+library(igraph)
+library(vegan)
+library(reshape2)
+library(ggplot2)
+library(nlme) 
+library(MuMIn) 
+library(lme4) 
+library(MASS) 
+library(car) 
+library(RVAideMemoire) 
+library(DHARMa) 
+library(lmerTest)
+library(dplyr)
+library(emmeans)
+library(ggplot2)
+library(glmmTMB)
+library(performance)
+library(car)
+```
+
+```{r}
+df <-read.csv(here::here("GLMM/data/derived_data/20250522_jd_complet.csv"), sep = ",")
+df_log=df
+```
+
+## Calcul richesse spécifique en helminthe
+
+```{r}
+parasites <- df[, c("syphacia_stroma", "heligmosomoides_polygyrus", "hymenolepis_hiberna","syphacia_frederici","hydatigera_parva","aspiculuris_tetraptera","skrjabinotaenia_lobata", "trichuris")]
+infos <- df[, c("demogroup","sexe", "SMI", "poids", "longueur_tete_corps", "richesse_spe_AP", "habitat1", "habitat2")]
+```
+
+```{r}
+df$richesse <- rowSums(parasites > 0)
+
+ggplot(df, aes(x = richesse)) + geom_bar()
+```
+
+```{r}
+summary(df$richesse)
+```
+
+## Shannon
+
+```{r}
+## Ne pas calculer shannon sur les richesses = 0
+df <- df %>%
+  rowwise() %>%
+  mutate(
+    shannon = ifelse(richesse > 0,
+                     vegan::diversity(c_across(2:9), index = "shannon"),
+                     NA_real_)
+  ) %>%
+  ungroup()
+```
+
+```{r}
+ggplot(df, aes(x = shannon)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "black") +
+  theme_minimal() +
+  labs(x = "Indice de Shannon", y = "Nombre d'individus")
+```
+
+```{r}
+summary(df$shannon)
+```
+
+## Simpson
+
+```{r}
+## Ne pas calculer simpson sur les richesses = 0
+df <- df %>%
+  rowwise() %>%
+  mutate(
+    simpson = ifelse(richesse > 0,
+                     vegan::diversity(c_across(2:9), index = "simpson"),
+                     NA_real_)
+  ) %>%
+  ungroup()
+```
+
+```{r}
+ggplot(df, aes(x = simpson)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "black") +
+  theme_minimal() +
+  labs(x = "Indice de Simpson", y = "Nombre d'individus")
+```
+
+```{r}
+summary(df$simpson)
+```
+
+# Transformation log (x+1=)
+
+```{r}
+df_log[, 2:9] <- log(df_log[, 2:9] + 1)
+parasites <- df_log[, c("syphacia_stroma", "heligmosomoides_polygyrus", "hymenolepis_hiberna","syphacia_frederici","hydatigera_parva","aspiculuris_tetraptera","skrjabinotaenia_lobata", "trichuris")]
+
+df_log$richesse <- rowSums(parasites > 0)
+```
+
+## Shannon
+
+```{r}
+## Ne pas calculer shannon sur les richesses = 0
+
+df_log <- df_log %>%
+  rowwise() %>%
+  mutate(
+    shannon = ifelse(richesse > 0,
+                     vegan::diversity(c_across(2:9), index = "shannon"),
+                     NA_real_)
+  ) %>%
+  ungroup()
+
+```
+
+```{r}
+ggplot(df_log, aes(x = shannon)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "black") +
+  theme_minimal() +
+  labs(x = "Indice de Shannon", y = "Nombre d'individus")
+```
+
+## Simpson
+
+```{r}
+## Ne pas calculer simpson sur les richesses = 0
+df_log <- df_log %>%
+  rowwise() %>%
+  mutate(
+    simpson = ifelse(richesse > 0,
+                     vegan::diversity(c_across(2:9), index = "simpson"),
+                     NA_real_)
+  ) %>%
+  ungroup()
+
+```
+
+```{r}
+ggplot(df_log, aes(x = simpson)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "black") +
+  theme_minimal() +
+  labs(x = "Indice de Simpson", y = "Nombre d'individus")
+```
+
+# Export
+
+```{r}
+write.csv(df, here::here("GLMM/data/derived_data/20250612_div_indice.csv"), row.names = FALSE, quote = TRUE)
+```
+
+```{r}
+write.csv(df_log, here::here("GLMM/data/derived_data/20250612_div_indice_log.csv"), row.names = FALSE, quote = TRUE)
+```
+
+# GLMM
+
+```{r}
+t <-read.csv(here::here("GLMM/data/derived_data/20250612_div_indice.csv"), sep = ",")
+t <- t %>% filter(richesse != 0)
+```
+
+```{r}
+### Centrer réduire variables 
+t$SMI_z <- scale(t$SMI)        
+t$richesse_spe_AP_z <- scale(t$richesse_spe_AP)
+t$poids_z <- scale(t$poids)
+```
+
+## Shannon
+
+```{r}
+### GLMM
+model <- glmmTMB(shannon ~ sexe + poids_z + SMI_z + habitat1 + richesse_spe_AP_z + (1 | numero_ligne), ziformula = ~1, family = tweedie(link = "log"), data = t, na.action = na.fail)
+```
+
+```{r}
+### Selection des modèles avec les AICc les plus faibles
+SelectionModels<-MuMIn::dredge(model,rank = "AICc")
+
+TopModels <- subset(SelectionModels, delta < 2)
+TopModels
+```
+
+Le modèle le plus parcimonieux et avec le meilleur AICc est choisit
+
+```{r}
+### Vérification des résidus
+
+model <- glmmTMB(shannon ~  richesse_spe_AP_z + (1 | numero_ligne), ziformula = ~1, family = tweedie(link = "log"), data = t, na.action = na.fail)
+
+#model <- glmmTMB(shannon ~  richesse_spe_AP_z + (1 | numero_ligne), ziformula = ~1, family = gaussian(link = "identity"), data = t, na.action = na.fail)
+
+check_overdispersion(model)
+```
+
+```{r}
+Res<-DHARMa::simulateResiduals(model, n = 250, refit = F, integerResponse = NULL, plot = F, seed = 123) 
+plot(Res, rank = TRUE) 
+
+testDispersion(Res)
+testResiduals(Res)
+```
+
+```{r}
+### Test de délétion et vraissemblance pour obtenir significativité des variables
+car::Anova(model, type = 2)
+```
+
+```{r}
+### Sens de significativité des variables
+summary(model) 
+```
+
+```{r}
+### Obtention des R²
+null_model <- glmmTMB(shannon ~ 1 + (1 | numero_ligne), 
+                      ziformula = ~1,
+                      family = tweedie(link = "log"),
+                      data = t,
+                      na.action = na.omit) ## Pour avoir valeurs du modèle nul car MunMin ne le fait pas directement quadn c'est la distribution tweedie
+
+MuMIn::r.squaredGLMM(model, null_model = null_model)
+
+```
+
+## Simpson
+
+```{r}
+### GLMM
+model_si <- glmmTMB(simpson ~ sexe + poids_z + SMI_z + habitat1 + richesse_spe_AP_z + (1 | numero_ligne), ziformula = ~1, family = tweedie(link = "log"), data = t, na.action = na.fail)
+```
+
+```{r}
+### Selection des modèles avec les AICc les plus faibles
+SelectionModels<-MuMIn::dredge(model_si,rank = "AICc")
+
+TopModels <- subset(SelectionModels, delta < 2)
+TopModels
+```
+
+```{r}
+### Vérification des résidus
+model_si <- glmmTMB(simpson ~  richesse_spe_AP_z + (1 | numero_ligne), ziformula = ~1, family = tweedie(link = "log"), data = t, na.action = na.fail)
+check_overdispersion(model_si)
+```
+
+```{r}
+Res<-DHARMa::simulateResiduals(model_si, n = 250, refit = F, integerResponse = NULL, plot = F, seed = 123) 
+plot(Res, rank = TRUE) 
+
+testDispersion(Res)
+testResiduals(Res)
+```
+
+```{r}
+### Test de délétion et vraissemblance pour obtenir significativité des variables
+car::Anova(model_si, type = 2)
+```
+
+```{r}
+### Sens de significativité des variables
+summary(model) 
+```
+
+```{r}
+### Obtention des R²
+null_model <- glmmTMB(simpson ~ 1 + (1 | numero_ligne), 
+                      ziformula = ~1,
+                      family = tweedie(link = "log"),
+                      data = t,
+                      na.action = na.omit) ## Pour avoir valeurs du modèle nul car MunMin ne le fait pas directement quadn c'est la distribution tweedie
+
+MuMIn::r.squaredGLMM(model_si, null_model = null_model)
+```
+
+# 

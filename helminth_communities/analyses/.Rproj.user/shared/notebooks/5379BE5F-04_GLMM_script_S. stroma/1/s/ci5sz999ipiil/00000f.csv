@@ -1,0 +1,27 @@
+"0","## Intensité"
+"0","summary(ModelSelected_intensite_glmm) "
+"1"," Family: "
+"1","nbinom2  ( log )
+Formula:          syphacia_stroma ~ habitat1 + (1 | numero_ligne)
+Data: t_infectes
+
+      AIC       BIC    logLik -2*log(L)  df.resid 
+    321.5     328.8    -155.7     311.5        27 
+
+Random effects:
+
+Conditional model:
+ Groups       Name        Variance  Std.Dev. 
+ numero_ligne (Intercept) 3.627e-09 6.023e-05
+Number of obs: 32, groups:  numero_ligne, 20
+
+Dispersion parameter for nbinom2 family (): 0.859 
+
+Conditional model:
+             Estimate Std. Error z value Pr(>|z|)    
+(Intercept)    3.9703     0.3439  11.546   <2e-16 ***
+habitat1haie   0.3124     0.4380   0.713   0.4756    
+habitat1pins  -1.4182     0.5702  -2.487   0.0129 *  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+"

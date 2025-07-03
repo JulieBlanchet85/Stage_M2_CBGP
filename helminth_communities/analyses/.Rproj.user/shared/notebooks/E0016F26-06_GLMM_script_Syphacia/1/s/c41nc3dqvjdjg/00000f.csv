@@ -1,0 +1,21 @@
+"0","## Présence-absence"
+"0","drop1(ModelSelected_pres_abs_glmm,.~.,test=""Chisq"")"
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"
+"1","Single term deletions
+
+Model:
+syphacia ~ sexe + (1 | numero_ligne)
+"
+"1","       npar    AIC    LRT Pr(Chi)
+<none>      162.46               
+sexe      1 162.72 2.2616  0.1326
+"
+"0","#ANOVA tient compte positions variables donc pas cool"
+"0","#drop 1 tient pas compte position variable dans code donc cool"
+"0","#df = nb modalité de la variable -1"
+"0","# LRT c'est la valuer de test"
+"0","#Test si effet significatif de la variable sur le modèle"
+"0",""
+"0","#### AVEC MODELE COMPLET"
+"0","#drop1(glmm_pres_abs,.~.,test=""Chisq"")"

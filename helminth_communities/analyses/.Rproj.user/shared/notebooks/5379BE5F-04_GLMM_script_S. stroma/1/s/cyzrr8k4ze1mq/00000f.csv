@@ -1,0 +1,2 @@
+"0","## Enlever ind qui ont plus de 400 syphacias"
+"0","t_infectes <- subset(t_infectes, syphacia_stroma < 400)"

@@ -1,0 +1,4 @@
+"0","### Enlever les femelles gestantes dans la mesure ?"
+"0","fiche_dissection %>%"
+"0","  dplyr::count(gestation)%>%"
+"0","  mutate(pourcentage = n / sum(n) * 100) #🔴 13% de gestante même si plus que 10% je choisi de les enlever "

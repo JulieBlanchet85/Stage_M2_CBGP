@@ -1,0 +1,391 @@
+|                            |
+|----------------------------|
+| title: "05_GLMM_S. stroma" |
+| utput: html_document       |
+
+## Packages & datasets loading
+
+```{r, include = FALSE}
+#install.packages(c("MuMIn","nlme","lme4", "MASS", "car", "RVAideMemoire", "DHARMa", "lmerTest","emmeans))
+
+library(nlme) 
+library(MuMIn) 
+library(lme4) 
+library(MASS) 
+library(car) 
+library(RVAideMemoire) 
+library(DHARMa) 
+library(lmerTest)
+library(dplyr)
+library(emmeans)
+library(performance)
+library(ggplot2)
+library(glmmTMB)
+```
+
+## Chargement
+
+```{r}
+t <-read.csv(here::here("GLMM/data/derived_data/20250522_jd_complet.csv"), sep = ",")
+
+t$habitat1=as.factor(t$habitat1)
+t$habitat2=as.factor(t$habitat2)
+
+
+t %>%
+  dplyr::count(syphacia_stroma>0)%>%
+  mutate(pourcentage = n / sum(n) * 100)
+```
+
+# GLMM
+
+Selon règle empirique, il faut minimum 10 observations par paramètres pour que la capacité d'estimation du GLM soit pas trop mauvaise. Sachant que v quati compte pour un paramètre chacune et que v quali compte K-1 paramètres, avec K nombre de modalités de la variable
+
+#### PRESENCE-ABSENCE
+
+```{r}
+##### PRESENCE ABSENCE
+
+##GLMM avec données 1/0 
+##Transformation jeu de donnees en presence-absence
+t_pres_abs <- t
+colonnes_parasites <- c("syphacia_stroma", "heligmosomoides_polygyrus", "hymenolepis_hiberna","syphacia_frederici","hydatigera_parva","aspiculuris_tetraptera","skrjabinotaenia_lobata", "trichuris")
+
+t_pres_abs[colonnes_parasites] <- lapply(t_pres_abs[colonnes_parasites], function(x) ifelse(x > 0, 1, 0))
+
+### Combien de fois chaque ligne
+table(t_pres_abs$numero_ligne)
+```
+
+```{r}
+#centrer-réduire pour que toutes les varaibles soient sur la même base
+t_pres_abs$SMI_z <- scale(t_pres_abs$SMI)        
+t_pres_abs$richesse_spe_AP_z <- scale(t_pres_abs$richesse_spe_AP)
+t_pres_abs$poids_z <- scale(t_pres_abs$poids)
+```
+
+```{r}
+## GLMM Présence Absence
+glmm_pres_abs<-glmer(syphacia_stroma~sexe+poids_z+SMI_z+habitat1+richesse_spe_AP_z+(1|numero_ligne),data=t_pres_abs,family=binomial(link="logit"),na.action="na.fail",control=glmerControl(optCtrl=list(maxfun=20000))) 
+```
+
+#### INTENSITE
+
+```{r}
+##### INTENSITE
+
+##Transformation jeu de données en intensité
+# Garder uniquement les individus chez qui heligmosomoides_polygyrus > 0
+t_infectes <- subset(t, syphacia_stroma > 0)
+
+### Combien de fois chaque ligne
+table(t_infectes$numero_ligne)
+
+### Scale
+t_infectes$SMI_z <- scale(t_infectes$SMI)        
+t_infectes$richesse_spe_AP_z <- scale(t_infectes$richesse_spe_AP)
+t_infectes$poids_z <- scale(t_infectes$poids)
+    
+t_infectes$richesse_spe_AP_z <- scale(t_infectes$richesse_spe_AP)
+t_infectes$poids_z <- scale(t_infectes$poids)
+
+```
+
+```{r}
+## Distribution intenisté
+#Graph 1
+plot(t_infectes$syphacia_stroma, 1:nrow(t_infectes),
+     xlab = "Nombre de syphacia stroma",
+     ylab = "Index des rongeurs",
+     main = "Nuage de points : distribution de Syphacia stroma",
+     pch = 19, col = "blue")
+
+
+# Graph 2
+# Compter le nombre de rongeurs pour chaque nombre de H. polygyrus
+t_infectes_count <- t_infectes %>%
+  group_by(syphacia_stroma) %>%
+  summarise(n_rongeurs = n())
+ggplot(t_infectes_count, aes(x = syphacia_stroma, y = n_rongeurs)) +
+  geom_col(fill = "steelblue") +
+  labs(
+    x = "Nombre de S.stroma",
+    y = "Nombre de rongeurs infectés",
+    title = "Distribution du nombre de S. stroma"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+## Plot du SMI en fonction de l'intensité pour voir si on peut dire que y a un SMI qu'on peut juger faible et un fort qui sont les bornes de la "bonne santé"
+plot(t_infectes$syphacia_stroma, t_infectes$SMI,
+     xlab = "Nombre de syphacia stroma",
+     ylab = "SMI",
+     main = "Nuage de points : distribution de Syphacia stroma",
+     pch = 19, col = "blue")
+```
+
+```{r}
+##GLMM avec donnees intensite
+glmm_intensite<-glmmTMB::glmmTMB(syphacia_stroma~sexe+poids_z+SMI_z+habitat1+richesse_spe_AP_z+(1|numero_ligne),data=t_infectes,family=nbinom2,na.action="na.fail")
+
+```
+
+## *Selection de modeles*
+
+#### ABSENCE PRESENCE
+
+```{r}
+## Présences-absences
+SelectionModels_pres_abs_glmm<-MuMIn::dredge(glmm_pres_abs,rank = "AICc")
+
+#logLik = vraisemblance du modèle (+ proche de 0 = meilleur(je crois))
+#delta = différence d'AICc par rapport au meilleure modèle (souvent on considère que les modèle qui ont un delta <2)
+#weight = Poids d'Akaike (proba que ça soit le meilleur modèle parmi ceux testé)
+
+TopModels_pres_abs_glmm<-subset(SelectionModels_pres_abs_glmm,delta<2) 
+TopModels_pres_abs_glmm
+```
+
+#### INTENSITE
+
+```{r}
+## Intensité
+SelectionModels_intensite_glmm<-MuMIn::dredge(glmm_intensite,rank = "AICc")
+
+TopModels_intensite_glmm<-subset(SelectionModels_intensite_glmm,delta<2) 
+TopModels_intensite_glmm
+```
+
+## *Verification/validation du modèle choisi*
+
+Verifier si problème de dispersion des données --\> si oui, opter pour modèles quasi
+
+#### PRESENCE ABSENCE
+
+```{r}
+## Presence-absence
+ModelSelected_pres_abs_glmm<-glmer(syphacia_stroma~sexe+(1|numero_ligne),data=t_pres_abs,family=binomial(link="logit"),na.action="na.fail",control=glmerControl(optCtrl=list(maxfun=20000))) 
+
+overdisp.glmer(ModelSelected_pres_abs_glmm) # fonctionne qu'avec GLMM
+
+#Si message boundary fit ça veut dire que pas d'effets de l'effet aléatoire donc on peut passer a un GLM ou pas
+# Le ratio c'est la dispersion donc on peut voir si sur ou sous dispersion
+```
+
+Verrification des résidus
+
+```{r}
+Res<-DHARMa::simulateResiduals(ModelSelected_pres_abs_glmm, n = 250, refit = F, integerResponse = NULL, plot = F, seed = 123) 
+plot(Res, rank = TRUE) 
+# QQ plot : résidu doivent suivre la droite rouge, ça veut dire que résidus suivent la distribution attendue
+  # KS test (Kolmogorov-Smirnov test) : Ce test compare la distribution des résidus avec une distribution théorique. p = 0 signifie que le test a rejeté l'hypothèse nulle (que les résidus suivent une distribution donnée) avec une très forte évidence.
+  #Dispersion test : Ce test évalue si la dispersion (ou la variance) des résidus est homogène ou non.p = 0 indique une déviation significative, ce qui signifie qu'il y a une violation de l'hypothèse d'homogénéité de la variance. (homo-hétéroscédasticité)
+  #Outlier test : Cherche à identifier les points de données qui sont des outliers dans ton modèle.p = 0 dans ce test signifie qu'il y a une forte preuve statistique que tes données contiennent des outliers.
+
+#residual vs. predicted : on ne doit pas distinguer de structures particulières doivent être distribué aléatoirement (indépendance des résidus)
+
+#### Test de dispersion seul
+testDispersion(Res)
+
+#### Test d'hétéroscédasticité
+testResiduals(Res)
+# 1er c'est test uniformité des résidus
+# 2eme c'est outliers
+# 3ème c'est test de dispersion (=test hétéro-homoscédasticité)
+```
+
+#### INTENSITE
+
+```{r}
+## Intensité
+ModelSelected_intensite_glmm<-glmmTMB::glmmTMB(syphacia_stroma~poids_z+habitat1+(1|numero_ligne),data=t_infectes,family=nbinom2,na.action="na.fail")
+
+check_overdispersion(ModelSelected_intensite_glmm)
+```
+
+Verification des residus (evaluer la qualite du modele)
+
+```{r}
+Res<-DHARMa::simulateResiduals(ModelSelected_intensite_glmm, n = 250, refit = F, integerResponse = NULL, plot = F, seed = 123) 
+plot(Res, rank = TRUE) 
+
+testDispersion(Res)
+testResiduals(Res)
+```
+
+## *Test du modele choisi + tests de significativite des variables*
+
+#### PRESENCE ABSENCE
+
+```{r}
+## Présence-absence
+drop1(ModelSelected_pres_abs_glmm,.~.,test="Chisq")
+
+#ANOVA tient compte positions variables donc pas cool
+#drop 1 tient pas compte position variable dans code donc cool
+#df = nb modalité de la variable -1
+# LRT c'est la valuer de test
+#Test si effet significatif de la variable sur le modèle
+```
+
+#### INTENSITE
+
+```{r}
+## Intensite
+#drop1(ModelSelected_intensite_glmm,.~.,test="Chisq")
+
+car::Anova(ModelSelected_intensite_glmm, type = 2)
+```
+
+## *Determiner sens des corrélations et différences entre modalités*
+
+### ——— Variables quantitatives et variables qualitatives à 2 modalités ———
+
+#### PRESENCE ABSENCE
+
+```{r}
+## Présence_absence
+summary(ModelSelected_pres_abs_glmm) 
+```
+
+#### INTENSITE
+
+```{r}
+## Intensité
+summary(ModelSelected_intensite_glmm) 
+```
+
+### ——— Post-hoc comparaisons (comparaisons 2 à 2 pour variables à plus de 2 modalités) ———
+
+#### INTENSITE
+
+```{r}
+attach(t_infectes)
+emmeans::emmeans(ModelSelected_intensite_glmm,pairwise ~ habitat1, type = 'response') #response c'est pour remettre sur l'echelle réelle (c'est du début, donc le nb de paraasite)
+detach(t_infectes)
+#emmeans : intensité moyennes obtenues
+#contrasts : ratios et p_values
+```
+
+## *Pourcentage d'explication du modèle (proportion of variation explained by the model in total)*
+
+```{r}
+##Presence-absence
+MuMIn::r.squaredGLMM(ModelSelected_pres_abs_glmm)
+```
+
+```{r}
+## Intensité
+MuMIn::r.squaredGLMM(ModelSelected_intensite_glmm)
+```
+
+# Graphiques
+
+#### INTENSITE
+
+### *Plot intensité et variables significatives*
+
+```{r}
+## INTENSITE
+plot(t_infectes$poids, t_infectes$syphacia_stroma,
+     xlab = "poids",
+     ylab = "Intensité d'infection par S. stroma",
+     main = "Distribution de S. stroma en fonction du poids",
+     pch = 19, col = "darkgreen")
+     
+mod <- lm(syphacia_stroma ~ poids, data = t_infectes)
+abline(mod, col = "black", lwd = 2)     
+
+```
+
+#### *Plot de l'intensité d'infection en fonction des catégories paysagères avec courbe prédite par GLMM*
+
+```{r}
+# Renommer les niveaux du facteur habitat1
+t_infectes$habitat1 <- factor(t_infectes$habitat1,
+                      levels = c("haie", "feuillus", "pins"),
+                      labels = c("Haies", "Îlots de feuillus", "Lisières de pins"))
+
+# Définir les couleurs manuellement
+couleurs_habitat <- c("Haies" = "#90EE90",       # vert clair
+                      "Îlots de feuillus" = "#006400",   # vert foncé
+                      "Lisières de pins" = "#8B4513")       # marron
+
+# Convertir habitat1 en facteur
+t_infectes$habitat1 <- as.factor(t_infectes$habitat1)
+
+ggplot(t_infectes, aes(x = habitat1, y = syphacia_stroma, fill = habitat1)) +
+  geom_violin(trim = FALSE, color = NA, alpha = 0.5) +  # Pas de contour, pas de boxplot
+  geom_jitter(aes(color = habitat1), width = 0.2, size = 2, alpha = 0.7) +  # Points individuels
+  scale_fill_manual(values = couleurs_habitat) +
+  scale_color_manual(values = couleurs_habitat) +
+  labs(
+    x = "Catégorie paysagère",
+    y = "Intensité d’infection par S. Stroma",
+    title = "Intensité d’infection par S. stroma selon la catégorie paysagère"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")  # On enlève la légende si pas nécessaire
+
+```
+
+### *Intensité d'infection en fonction du poids avec courbe prédite par GLMM*
+
+```{r}
+# Recode habitat1 et ligne echantillonnage pour coller aux niveaux utilisés dans le modèle
+t_infectes$habitat1 <- factor(t_infectes$habitat1,
+                              levels = c("Haies", "Lisières de pins", "Îlots de feuillus"),
+                              labels = c("haie", "pins", "feuillus"))
+
+t_infectes$numero_ligne <- factor(t_infectes$numero_ligne)
+levels(t_infectes$numero_ligne)  # Pour vérifier qu’il y a bien des niveaux
+```
+
+```{r}
+new_data <- data.frame(
+  poids_z = seq(min(t_infectes$poids_z, na.rm = TRUE),
+                max(t_infectes$poids_z, na.rm = TRUE),
+                length.out = 100)
+)
+
+new_data$SMI_z <- 0
+new_data$habitat1 <- factor("haie", levels = levels(t_infectes$habitat1))
+
+new_data$numero_ligne <- factor(
+  rep(levels(t_infectes$numero_ligne)[1], nrow(new_data)),
+  levels = levels(t_infectes$numero_ligne)
+)
+pred <- predict(ModelSelected_intensite_glmm,
+                newdata = new_data,
+                se.fit = TRUE,
+                type = "response",
+                re.form = NA)
+# Ajouter les colonnes
+new_data$fit <- pred$fit
+new_data$se <- pred$se.fit
+
+# Remettre l'échelle originale du poids
+mean_poids <- mean(t_infectes$poids, na.rm = TRUE)
+sd_poids <- sd(t_infectes$poids, na.rm = TRUE)
+new_data$poids <- new_data$poids_z * sd_poids + mean_poids
+
+# Graphique
+ggplot(t_infectes, aes(x = poids, y = syphacia_stroma)) +
+  geom_point(alpha = 0.5, color = "darkgreen") +
+  geom_line(data = new_data, 
+            aes(x = poids, y = fit), 
+            inherit.aes = FALSE, 
+            color = "darkgreen", linewidth = 1.2) +
+  geom_ribbon(data = new_data,
+              aes(x = poids, ymin = fit - 1.96 * se, ymax = fit + 1.96 * se),
+              inherit.aes = FALSE,
+              fill = "darkgreen", alpha = 0.2) +
+  labs(
+    x = "Poids",
+    y = "Intensité d'infection par S.stroma",
+    title = "Intensité d'infection par S. stroma en fonction du poids"
+  ) +
+  theme_minimal()
+```

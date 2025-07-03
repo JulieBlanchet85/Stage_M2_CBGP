@@ -1,0 +1,38 @@
+"0","## Présence_absence"
+"0","summary(ModelSelected_pres_abs_glmm) "
+"1","Generalized linear mixed model fit by maximum likelihood (Laplace Approximation) ['glmerMod']
+ Family: binomial  ( logit )
+Formula: syphacia ~ sexe + (1 | numero_ligne)
+   Data: t_pres_abs
+Control: glmerControl(optCtrl = list(maxfun = 20000))
+
+      AIC       BIC    logLik -2*log(L)  df.resid 
+    162.5     170.7     -78.2     156.5       112 
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-1.2753 -0.9515  0.7793  0.9933  1.0695 
+
+Random effects:
+ Groups       Name        Variance Std.Dev.
+ numero_ligne (Intercept) 0.03374  0.1837  
+Number of obs: 115, groups:  numero_ligne, 39
+
+Fixed effects:
+            Estimate Std. Error z value Pr(>|z|)
+(Intercept)  -0.1061     0.2637  -0.403    0.687
+sexeM         0.5781     0.3905   1.480    0.139
+
+Correlation of Fixed Effects:
+      (Intr)
+sexeM -0.672
+"
+"0","# Compare les modalités donc si plus que deux ne fait pas toutes les comparaisons mais juste avec celui qui est le plus en haut dans ordre alphabétique"
+"0","# Si estimate est -qqch pour sexeM ça veut dire que les mâles ont une charge + faible que les femelles"
+"0","# Si estimate ICP est positif veut dire que meilleur état corporel est lié à une augmentation de la charge parasitaire"
+"0","# Si estimate IgA est positif veut dire que un niveau + élevé d'IgA est associé à une charge parasitiare +  élevée"
+"0",""
+"0",""
+"0","###### AVEC MODELE COMPLET"
+"0","#summary(glmm_pres_abs) "
+"0",""

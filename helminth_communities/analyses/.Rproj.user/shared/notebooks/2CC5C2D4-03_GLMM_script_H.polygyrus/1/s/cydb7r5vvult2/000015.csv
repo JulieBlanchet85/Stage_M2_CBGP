@@ -1,0 +1,34 @@
+"0","testResiduals(Res)"
+"1","$uniformity
+
+	Asymptotic one-sample Kolmogorov-Smirnov test
+
+data:  simulationOutput$scaledResiduals
+D = 0.077807, p-value = 0.6064
+alternative hypothesis: two-sided
+
+
+$dispersion
+
+	DHARMa nonparametric dispersion test via sd of residuals fitted vs. simulated
+
+data:  simulationOutput
+dispersion = 1.1986, p-value = 0.464
+alternative hypothesis: two.sided
+
+
+$outliers
+
+	DHARMa bootstrapped outlier test
+
+data:  simulationOutput
+outliers at both margin(s) = 0, observations = 96, p-value = 1
+alternative hypothesis: two.sided
+ percent confidence interval:
+ 0.00000 0.03125
+sample estimates:
+outlier frequency (expected: 0.0059375 ) 
+                                       0 
+
+
+"

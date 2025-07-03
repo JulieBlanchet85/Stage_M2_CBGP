@@ -1,0 +1,9 @@
+"0","## GLMM presence absence"
+"0","#centrer-réduire pour que toutes les varaibles soient sur la même base"
+"0","t_pres_abs$SMI_z <- scale(t_pres_abs$SMI)        "
+"0","t_pres_abs$richesse_spe_AP_z <- scale(t_pres_abs$richesse_spe_AP)"
+"0","t_pres_abs$poids_z <- scale(t_pres_abs$poids)"
+"0",""
+"0","glmm_pres_abs<-glmer(syphacia~sexe+poids_z+SMI_z+habitat1+richesse_spe_AP_z+(1|numero_ligne),data=t_pres_abs,family=binomial(link=""logit""),na.action=""na.fail"",control=glmerControl(optCtrl=list(maxfun=20000))) "
+"2","G3;boundary (singular) fit: see help('isSingular')
+g"

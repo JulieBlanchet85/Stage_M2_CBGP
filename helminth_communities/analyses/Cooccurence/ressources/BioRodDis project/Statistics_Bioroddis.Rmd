@@ -1,0 +1,1435 @@
+---
+title: "Network analysis BioRodDis"
+author: "Vincent Sluydts"
+date: "2025-04-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#library(devtools)
+#install_github('mjwestgate/circleplot')
+
+library(cooccur)
+library(circleplot)
+library(gmp)
+library(bipartite)
+library(tnet)
+library(tidyverse)
+library(glmmTMB)
+library(factoextra)
+library(FactoMineR)
+
+
+
+```
+
+Code for a function transforming the output data into a matrix for the network analysis, ,used further downstream.
+
+```{r include=FALSE}
+getwd()
+source("Rest_functions.R", local = knitr::knit_global())
+```
+
+
+## Input Data
+
+
+```{r eval=FALSE, include=FALSE}
+rm(list = ls())
+```
+
+
+```{r }
+#read in  your data
+#getwd()
+dat<-readRDS("./data/bioroddis.rds")
+names(dat)
+```
+```{r }
+dat  |> filter(hab2 == 'Urban Park') |> select(Site_Code) |> distinct() |> count() #8 urban sites
+```
+
+```{r}
+dat  |> filter(hab2 == 'Forest') |> select(Site_Code) |> distinct() |> count() #21 forested sites
+```
+Trap sites per country per habitat
+```{r}
+dat |> distinct(Site_Code, .keep_all=T) |> select(Country, hab2) |> table()
+``` 
+Note that in Poland trapping did not take place in an Urban green spaces. 
+
+# Host community & Anthropization
+
+### Community composition
+
+Poland was removed from community analysis as trapping was conducted in one habitat only. 
+GEFKAT and GEFKIR are sites in GERMANY that were abandoned after low number of rodents were collected and Winter 2020 is a site in Belgium were an additional trap was placed at the university campus off-season. 
+
+```{r }
+dat %>%  filter(Site_Code != "GEFKAT" & Site_Code != "GEFKIR" & Period != "Winter_2020" & Country != "Poland") %>% droplevels()-> dat2
+```
+
+```{r }
+dat2 %>% dplyr::select(Species, Site_Code) %>% table() -> m1
+m2<- as.matrix(t(m1)) 
+m3 <- as.data.frame.matrix(m2)  #site x species data frame 
+```
+
+```{r}
+dat2 %>% select(Site_Code, Country, hab2, hab3, HFI) %>% distinct(Site_Code, .keep_all = T) -> meta 
+
+meta$group <- as.factor(paste(meta$Country,meta$hab2, sep = "_"))
+meta |> arrange(Site_Code) -> meta
+
+head(meta)
+```
+
+PERMANOVA to test if species community compostion is different between the two habitats nested within Countries.
+
+```{r}
+adonis2(m3 ~ Country/hab2, data=meta, permutations = 999, method="bray")
+```
+
+```{r}
+adonis2(m3 ~ Country/hab2, data=meta, permutations = 999, method="bray", by="onedf")
+```
+
+
+### PCA & MANOVA test on life history
+
+Life history and mass corrected LH data were obtained for our collected specimens from Albery et al. 2022:  https://github.com/viralemergence/UrbanOutputters/tree/main/Data/ 
+
+
+```{r}
+host <- readRDS(file='lifehist.rds')
+```
+
+```{r eval=FALSE, include=FALSE}
+host <- read.csv("C:/Users/vince/OneDrive - Universiteit Antwerpen/VISL_HD/Projects/BioRodDis/data/databases/Albery/reservoir_data_for_vin.csv", sep=",", dec=".")
+saveRDS(host, file='lifehist.rds')
+```
+
+```{r}
+names(host)
+```
+
+```{r}
+# Visualize distributions of traits by group
+ggplot(host, aes(x = Urban, y = Litters_Yr, fill = Urban)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  scale_fill_viridis_d() +
+  theme_minimal() +
+  labs(title = "Distribution of Litters_Yr by Urban Category",
+       x = "Urban Adaptation Category",
+       y = "Trait Value")
+```
+
+
+```{r}
+# Visualize distributions of traits by group
+ggplot(host, aes(x = Urban, y = LitterSize, fill = Urban)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  scale_fill_viridis_d() +
+  theme_minimal() +
+  labs(title = "Distribution of LitterSize by Urban Category",
+       x = "Urban Adaptation Category",
+       y = "Trait Value")
+```
+
+
+```{r}
+#str(host)
+host$Urban <- as.factor(host$Urban)
+
+traits_pca <-PCA(host[, c("AdultMass_g"  , "SexMat_d" ,  "Gest_d"  ,  "IBI_d"    , "LitterSize"    ,   "Litters_Yr"  ,   "BirthWt_g" ,  "Wean_d"    , "WeanWt_g" ,  "MaxLong_m")], ncp=2, scale.unit=TRUE)    
+ 
+summary(traits_pca)
+
+```
+
+Visualisation of the PCA in two dimensions per category of wildlife response to urbanisation
+
+```{r}
+# Visualize PCA with groups
+fviz_pca_biplot(traits_pca,
+                habillage = as.factor(host$Urban),
+                addEllipses = TRUE,
+                ellipse.level = 0.95,
+                palette = "viridis")
+```
+
+Multivariate ANOVA with mass-corrected residual life history traits as the response and wildlife repsonse categories as the explanatory variable. Life history mass corrected data were obtained for our specimens from Albery et al. 2022:  https://github.com/viralemergence/UrbanOutputters/tree/main/Data/
+
+```{r}
+# Multivariate Analysis of Variance (MANOVA)
+manova_result <- manova(cbind(res.GestationLen, res.LitterSize,res.NeonateBodyMass, res.InterbirthInterval, res.WeaningAge, res.SexualMaturityAge) ~ Urban, data=host)
+
+summary(manova_result, test = "Wilks")  
+
+```
+
+The MANOVA on the mass-corrected showed the life history traits not being associated with the urbanisation class, and neither did the overall principal components obtained in Albery 2022 based on a larger mammal database.
+
+```{r}
+eq1 <- PC1 ~ Urban
+eq2 <- PC2 ~ Urban
+
+
+
+U1 <- glmmTMB(eq1, data=host,
+                    ziformula=~0,
+                    family=gaussian)
+
+U2 <- glmmTMB(eq2, data=host,
+                    ziformula=~0,
+                    family=gaussian)
+
+
+```
+
+```{r}
+drop1(U1, test =  "Chisq")
+```
+
+```{r}
+drop1(U2, test =  "Chisq")
+```
+
+
+
+### Infection & Co-infection/exposure
+
+Simplify/ group pathogen names for Mycoplasma
+```{r}
+dat %>% select("Id_code",starts_with("Myco")) -> df
+df %>% mutate(Mycoplasma = rowSums(df[,2:9])) %>% select(Id_code, Mycoplasma) -> df
+
+
+head(df)
+
+```
+
+Create coinfection/co-occurence dataset 
+```{r}
+
+dat %>% left_join(df, by = "Id_code") -> dat2 #here we use all available specimens
+
+names<- c("Id_code", "Species","Country","Site_Code", "Bartonella","Ehrlichia","Candidatus_Neoehrlichia",   "Anaplasma" , "Francisella",  "Orientia"    ,   "Sarcocystidae"  ,   "IFA_POX" , "IFA_LCMV" ,"Borrelia" ,"Chlamydia" , "Rickettsia" ,   "Streptobacillus" ,"Hanta" ,"Lepto","Mycoplasma")
+
+coinfect <- dat2[,colnames(dat2) %in% names]
+
+```
+
+Rename pathpgens with abbrevatiated names for figures
+
+```{r}
+coinfect %>% rename(Bart = "Bartonella",   Ana = "Anaplasma", Fran =  "Francisella", Bor = "Borrelia"    , Ori =    "Orientia"    ,Ehrl = "Ehrlichia", Cneo =  "Candidatus_Neoehrlichia",  Sarc =  "Sarcocystidae"  , Myco =  "Mycoplasma"  , Chlm ="Chlamydia" , Rck= "Rickettsia"  ,   Strp = "Streptobacillus", MPX = "IFA_POX" , LCMV =  "IFA_LCMV" ) -> coinfect2
+```
+
+Group potentially zoonotic versus all infections
+
+```{r}
+names(coinfect2)
+
+inf.all <- c("Bart",  "Ana", "Fran","Ori" , "Sarc" ,     "MPX"   ,     "LCMV"    ,    "Bor"   ,    "Chlm"   ,   "Rck"   ,    "Strp"  , "Hanta" ,    "Lepto"   ,  "Myco"   ,   "Ehrl", "Cneo"   )
+
+inf.zoo <- c("Bart",  "Ana", "Fran","Ori" , "Sarc" ,     "MPX"   ,     "LCMV"    ,    "Bor"   ,    "Chlm"   ,   "Rck"   ,    "Strp"  , "Hanta" ,    "Lepto"   ,  "Ehrl"  , "Cneo" )
+
+coinfect3a <- coinfect2
+
+coinfect3a$inf <- rowSums(coinfect3a[,colnames(coinfect3a)%in%inf.all], na.rm=T)
+coinfect3a$zoo <- rowSums(coinfect3a[,colnames(coinfect3a)%in%inf.zoo], na.rm=T)
+```
+Output per host specimen
+
+```{r}
+coinfect3a %>% filter(Species == "Rattus_norvegicus" & inf > 1) -> out.rattus # 72  
+coinfect3a %>% filter(Species == "Rattus_norvegicus" & zoo > 1) -> out.rattus.z #26
+coinfect3a %>% filter(Species == "Apodemus_sylvaticus" & inf > 1) -> out.apo #628 
+coinfect3a %>% filter(Species == "Apodemus_sylvaticus" & zoo > 1) -> out.apo.z # 187 
+coinfect3a %>% filter(Species == "Clethrionomys_glareolus" & inf > 1) -> out.myo #739
+coinfect3a %>% filter(Species == "Clethrionomys_glareolus" & zoo > 1) -> out.myo.z #577
+coinfect3a %>% filter(Species == "Apodemus_flavicollis" & inf > 1) -> out.flavi #272
+coinfect3a %>% filter(Species == "Apodemus_flavicollis" & zoo > 1) -> out.flavi.z #133
+coinfect3a %>% filter(Species == "Apodemus_agrarius" & inf > 1) -> out.agri # 50
+coinfect3a %>% filter(Species == "Apodemus_agrarius" & zoo > 1) -> out.agri.z # 14
+coinfect3a %>% filter(Species == "Microtus_arvalis" & inf > 1) -> out.micro # 22 
+coinfect3a %>% filter(Species == "Microtus_arvalis" & zoo > 1) -> out.micro.z # 7
+```
+
+
+# Co-occurences 
+
+Co-occurence test and plots inspired by Sallinen 2020: https://doi.org/10.1038/s41467-020-19273-z
+
+### Rattus norvegicus
+
+```{r}
+coinfect2 %>% filter(Species == "Rattus_norvegicus") %>%  select(-c(Id_code, Country, Site_Code, Species)) %>% drop_na() %>% replace(. > 1, 1)  -> cooc_rats2
+```
+
+
+```{r}
+# 3.4.1 cooccurrence test 
+cooc_test <- cooccur(mat = t(cooc_rats2),
+                     type = "spp_site",
+                     spp_names = TRUE,
+                     thresh = TRUE)
+
+#cooc_test$results
+```
+
+positive non-random associations
+
+```{r}
+cooc_test$results[cooc_test$results$p_gt<0.05001, c("sp1_name", "sp2_name")]
+```
+
+negative non-random associations
+
+```{r}
+cooc_test$results[cooc_test$results$p_lt<0.05001, c("sp1_name", "sp2_name")]
+```
+
+```{r message=FALSE, warning=FALSE}
+
+cooc2 <- as.matrix(na.omit(cooc_rats2))
+
+cooc_all <- crossprod(cooc2)
+
+mat <- cooc_all 
+
+df = data.frame(from = rep(rownames(mat), times = ncol(mat)),
+                to = rep(colnames(mat), each = nrow(mat)),
+                value = as.vector(mat),
+                stringsAsFactors = FALSE)
+
+
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,500),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+
+
+
+```
+
+```{r eval=FALSE, include=FALSE}
+pdf(file = "figures/Rattus_norvegicus.pdf",
+    bg = "transparent", 
+    width = 4, 
+    height = 3)
+par(family = "serif")
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+dev.off()
+```
+
+### Apodemus sylvaticus
+
+```{r}
+coinfect2 %>% filter(Species == "Apodemus_sylvaticus") %>%  select(-c(Id_code, Country, Site_Code, Species)) %>% drop_na() %>% replace(. > 1, 1)  -> cooc_rats2
+```
+
+
+```{r}
+# 3.4.1 cooccurrence test
+cooc_test <- cooccur(mat = t(cooc_rats2),
+                     type = "spp_site",
+                     spp_names = TRUE,
+                     thresh = TRUE)
+#cooc_test$results
+```
+
+positive non-random associations
+```{r}
+cooc_test$results[cooc_test$results$p_gt<0.05001, c("sp1_name", "sp2_name")]
+```
+
+negative non-random associations
+```{r}
+cooc_test$results[cooc_test$results$p_lt<0.05001, c("sp1_name", "sp2_name")]
+```
+
+
+```{r}
+#library(circleplot)
+
+cooc2 <- as.matrix(na.omit(cooc_rats2))
+
+cooc_all <- crossprod(cooc2)
+
+mat <- cooc_all 
+
+df = data.frame(from = rep(rownames(mat), times = ncol(mat)),
+                to = rep(colnames(mat), each = nrow(mat)),
+                value = as.vector(mat),
+                stringsAsFactors = FALSE)
+
+
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+
+
+
+```
+
+```{r eval=FALSE, include=FALSE}
+pdf(file = "figures/Apodemus_sylvaticus.pdf",
+    bg = "transparent", 
+    width = 4, 
+    height = 3)
+par(family = "serif")
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+dev.off()
+```
+
+### Myodes glareolus
+
+```{r}
+coinfect2 %>% filter(Species == "Myodes_glareolus") %>%  select(-c(Id_code, Country, Site_Code, Species)) %>% drop_na() %>% replace(. > 1, 1)  -> cooc_rats2
+```
+
+
+```{r}
+# 3.4.1 cooccurrence test 
+cooc_test <- cooccur(mat = t(cooc_rats2),
+                     type = "spp_site",
+                     spp_names = TRUE,
+                     thresh = TRUE)
+#cooc_test$results
+
+plot(cooc_test)
+
+#effect.sizes(cooc_test,matrix=TRUE)
+```
+positive non-random associations
+
+```{r}
+cooc_test$results[cooc_test$results$p_gt<0.05001, c("sp1_name", "sp2_name")]
+```
+
+negative non-random associations
+
+```{r}
+cooc_test$results[cooc_test$results$p_lt<0.05001, c("sp1_name", "sp2_name")]
+```
+
+```{r}
+#library(circleplot)
+
+cooc2 <- as.matrix(na.omit(cooc_rats2))
+
+cooc_all <- crossprod(cooc2)
+
+mat <- cooc_all 
+
+df = data.frame(from = rep(rownames(mat), times = ncol(mat)),
+                to = rep(colnames(mat), each = nrow(mat)),
+                value = as.vector(mat),
+                stringsAsFactors = FALSE)
+#df
+
+
+```
+
+```{r}
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+
+```
+```{r eval=FALSE, include=FALSE}
+pdf(file = "figures/Myodes_glareolus.pdf",
+    bg = "transparent", 
+    width = 3, 
+    height = 3)
+par(family = "serif")
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+dev.off()
+```
+
+### Mus musculus
+```{r}
+coinfect2 %>% filter(Species == "Mus_musculus") %>%  select(-c(Id_code, Country, Site_Code, Species)) %>% drop_na() %>% replace(. > 1, 1)  -> cooc_rats2
+```
+
+
+```{r eval=FALSE, include=FALSE}
+# 3.4.1 cooccurrence test 
+cooc_test <- cooccur(mat = t(cooc_rats2),
+                     type = "spp_site",
+                     spp_names = TRUE,
+                     thresh = TRUE)
+
+# this subset does not contain pairs >5, so no test results
+
+#cooc_test$results
+
+```
+
+
+```{r}
+#library(circleplot)
+
+cooc2 <- as.matrix(na.omit(cooc_rats2))
+
+cooc_all <- crossprod(cooc2)
+
+mat <- cooc_all 
+
+df = data.frame(from = rep(rownames(mat), times = ncol(mat)),
+                to = rep(colnames(mat), each = nrow(mat)),
+                value = as.vector(mat),
+                stringsAsFactors = FALSE)
+#df
+
+
+```
+
+```{r}
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+
+```
+```{r eval=FALSE, include=FALSE}
+pdf(file = "figures/Mus_musculus.pdf",
+    bg = "transparent", 
+    width = 4, 
+    height = 3)
+par(family = "serif")
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+dev.off()
+```
+
+### Crocidure russula
+
+
+```{r}
+coinfect2 %>% filter(Species == "Crocidura_russula") %>%  select(-c(Id_code, Country, Site_Code, Species)) %>% drop_na() %>% replace(. > 1, 1)  -> cooc_rats2
+```
+
+
+```{r}
+cooc_test <- cooccur(mat = t(cooc_rats2),
+                     type = "spp_site",
+                     spp_names = TRUE,
+                     thresh = TRUE)
+cooc_test$results
+
+#plot(cooc_test)
+
+#effect.sizes(cooc_test,matrix=TRUE)
+```
+
+
+
+positive non-random associations
+```{r}
+cooc_test$results[cooc_test$results$p_gt<0.05001, c("sp1_name", "sp2_name")]
+```
+
+
+negative non-random associations
+```{r}
+cooc_test$results[cooc_test$results$p_lt<0.05001, c("sp1_name", "sp2_name")]
+```
+```{r}
+cooc2 <- as.matrix(na.omit(cooc_rats2))
+
+cooc_all <- crossprod(cooc2)
+
+mat <- cooc_all 
+
+df = data.frame(from = rep(rownames(mat), times = ncol(mat)),
+                to = rep(colnames(mat), each = nrow(mat)),
+                value = as.vector(mat),
+                stringsAsFactors = FALSE)
+#df
+
+```
+
+```{r}
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+
+```
+```{r eval=FALSE, include=FALSE}
+pdf(file = "figures/Crocidura_russula.pdf",
+    bg = "transparent", 
+    width = 4, 
+    height = 3)
+par(family = "serif")
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+dev.off()
+```
+
+### Apodemus flavicollis
+
+```{r}
+coinfect2 %>% filter(Species == "Apodemus_flavicollis") %>%  select(-c(Id_code, Country, Site_Code, Species)) %>% drop_na() %>% replace(. > 1, 1)  -> cooc_rats2
+```
+
+
+```{r}
+cooc_test <- cooccur(mat = t(cooc_rats2),
+                     type = "spp_site",
+                     spp_names = TRUE,
+                     thresh = TRUE)
+#cooc_test$results
+
+#plot(cooc_test)
+
+#effect.sizes(cooc_test,matrix=TRUE)
+```
+
+
+positive non-random associations
+
+```{r}
+cooc_test$results[cooc_test$results$p_gt<0.05001, c("sp1_name", "sp2_name")]
+```
+
+
+negative non-random associations
+```{r}
+cooc_test$results[cooc_test$results$p_lt<0.05001, c("sp1_name", "sp2_name")]
+```
+
+
+```{r}
+cooc2 <- as.matrix(na.omit(cooc_rats2))
+
+cooc_all <- crossprod(cooc2)
+
+mat <- cooc_all 
+
+df = data.frame(from = rep(rownames(mat), times = ncol(mat)),
+                to = rep(colnames(mat), each = nrow(mat)),
+                value = as.vector(mat),
+                stringsAsFactors = FALSE)
+#df
+
+
+```
+
+```{r}
+
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+
+```
+```{r eval=FALSE, include=FALSE}
+pdf(file = "figures/Apodemus_flavicollis.pdf",
+    bg = "transparent", 
+    width = 4, 
+    height = 3)
+par(family = "serif")
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+dev.off()
+```
+
+### Microtus arvalis
+
+```{r}
+coinfect2 %>% filter(Species == "Microtus_arvalis") %>%  select(-c(Id_code, Country, Site_Code, Species)) %>% drop_na() %>% replace(. > 1, 1)  -> cooc_rats2
+```
+
+
+```{r}
+# 3.4.1 cooccurrence test 
+cooc_test <- cooccur(mat = t(cooc_rats2),
+                     type = "spp_site",
+                     spp_names = TRUE,
+                     thresh = TRUE)
+#cooc_test$results
+
+#plot(cooc_test)
+
+#effect.sizes(cooc_test,matrix=TRUE)
+```
+
+positive non-random associations
+```{r}
+cooc_test$results[cooc_test$results$p_gt<0.05001, c("sp1_name", "sp2_name")]
+```
+
+negative non-random associations
+```{r}
+cooc_test$results[cooc_test$results$p_lt<0.05001, c("sp1_name", "sp2_name")]
+```
+
+```{r}
+cooc2 <- as.matrix(na.omit(cooc_rats2))
+
+cooc_all <- crossprod(cooc2)
+
+mat <- cooc_all 
+
+df = data.frame(from = rep(rownames(mat), times = ncol(mat)),
+                to = rep(colnames(mat), each = nrow(mat)),
+                value = as.vector(mat),
+                stringsAsFactors = FALSE)
+#df
+
+
+```
+
+```{r}
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+
+```
+
+```{r eval=FALSE, include=FALSE}
+pdf(file = "figures/Microtus_arvalis.pdf",
+    bg = "transparent", 
+    width = 4, 
+    height = 3)
+par(family = "serif")
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+dev.off()
+```
+
+
+### Apodemus agrarius
+
+```{r}
+coinfect2 %>% filter(Species == "Apodemus_agrarius") %>%  select(-c(Id_code, Country, Site_Code, Species)) %>% drop_na() %>% replace(. > 1, 1)  -> cooc_rats2
+```
+
+
+```{r}
+# 3.4.1 cooccurrence test 
+cooc_test <- cooccur(mat = t(cooc_rats2),
+                     type = "spp_site",
+                     spp_names = TRUE,
+                     thresh = TRUE)
+cooc_test$results
+
+#plot(cooc_test)
+
+#effect.sizes(cooc_test,matrix=TRUE)
+```
+
+positive non-random associations
+```{r}
+cooc_test$results[cooc_test$results$p_gt<0.05001, c("sp1_name", "sp2_name")]
+```
+
+
+negative non-random associations
+```{r}
+cooc_test$results[cooc_test$results$p_lt<0.05001, c("sp1_name", "sp2_name")]
+```
+
+```{r}
+#library(circleplot)
+
+cooc2 <- as.matrix(na.omit(cooc_rats2))
+
+cooc_all <- crossprod(cooc2)
+
+
+mat <- cooc_all 
+
+df = data.frame(from = rep(rownames(mat), times = ncol(mat)),
+                to = rep(colnames(mat), each = nrow(mat)),
+                value = as.vector(mat),
+                stringsAsFactors = FALSE)
+#df
+
+
+```
+
+```{r}
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+
+```
+```{r}
+pdf(file = "figures/Apodemus_agrarius.pdf",
+    bg = "transparent", 
+    width = 4, 
+    height = 3)
+par(family = "serif")
+circleplot:::circleplot(df, 
+                        cluster = FALSE,
+                        style = "classic",
+                        plot.control = list(point.labels = TRUE,
+                                            cex.point = 15,
+                                            line.breaks = c(-1,0,5,10,50,100,1000),
+                                            line.cols = c("#ffffff00", 
+                                                          "#faeaee", 
+                                                          "#e795aa", 
+                                                          "#c60032",
+                                                          "#630019",
+                                                          "#30000c"),
+                                            line.widths = 5))
+dev.off()
+```
+
+
+# HOST-PATHOGEN NETWORK
+
+
+Remove the low-sample size sites/season & Combine the leptospira outputs [ie. actual PCR + 16S].
+
+```{r }
+dat$Lepto <- ifelse((dat$lepto.lipl32 + dat$Leptospira)>0, 1, 0)
+dat %>% filter(Site_Code != "GEFKAT" & Site_Code != "GEFKIR" & Period != "Winter_2020") %>% droplevels()-> dat2
+```
+
+
+
+```{r}
+dat2 %>% dplyr::select(Species, Site_Code) %>% table() -> m1
+```
+
+
+Overview graph of HOST x SITE data
+
+```{r}
+#visweb(m1, labsize = 0.7, text = "interaction")
+visweb(m1, prednames = T, preynames = T, text = "interaction", textcol = "darkred", textsize = 1.3, plotsize = 16, labsize=2.0, type="nested")
+```
+
+Split data in Urban parks versus forested areas
+
+```{r}
+dat2 %>% filter(hab2 == 'Urban Park') -> dat.urban
+dat2 %>% filter(hab2 == 'Forest') -> dat.forest
+```
+
+
+```{r}
+dat.urban |> select(Site_Code) |> distinct()
+```
+
+
+
+### Urban network
+
+
+```{r}
+dat.urban %>% group_by(Species) %>% count(Bartonella) %>% filter(Bartonella == 1) %>% dplyr::select(Species, n) %>% rename(Bartonella = n) ->d1
+dat.urban %>% group_by(Species) %>% count(Mycoplasma_haemo) %>% filter(Mycoplasma_haemo == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_haemo = n)->d2
+dat.urban %>% group_by(Species) %>% count(Mycoplasma_coco) %>% filter(Mycoplasma_coco == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_coco = n)->d3
+dat.urban %>% group_by(Species) %>% count(Candidatus_Neoehrlichia) %>% filter(Candidatus_Neoehrlichia == 1) %>% dplyr::select(Species, n) %>% rename(Candidatus_Neoehrlichia = n)->d4
+dat.urban %>% group_by(Species) %>% count(Anaplasma) %>% filter(Anaplasma == 1) %>% dplyr::select(Species, n) %>% rename(Anaplasma = n)->d5
+dat.urban %>% group_by(Species) %>% count(Francisella) %>% filter(Francisella == 1) %>% dplyr::select(Species, n) %>% rename(Francisella = n)->d6
+dat.urban %>% group_by(Species) %>% count(Borrelia_1) %>% filter(Borrelia_1 == 1) %>% dplyr::select(Species, n) %>% rename(Borrelia_1 = n)->d7
+dat.urban %>% group_by(Species) %>% count(Borrelia_2) %>% filter(Borrelia_2 == 1) %>% dplyr::select(Species, n) %>% rename(Borrelia_2 = n)->a7
+dat.urban %>% group_by(Species) %>% count(Orientia) %>% filter(Orientia == 1) %>% dplyr::select(Species, n) %>% rename(Orientia = n)->d8
+dat.urban %>% group_by(Species) %>% count(Sarcocystidae) %>% filter(Sarcocystidae == 1) %>% dplyr::select(Species, n) %>% rename(Sarcocystidae = n)->d9
+dat.urban %>% group_by(Species) %>% count(Mycoplasma_penetrans) %>% filter(Mycoplasma_penetrans == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_penetrans = n)->d10
+dat.urban %>% group_by(Species) %>% count(Mycoplasma_ravipulmonis_1) %>% filter(Mycoplasma_ravipulmonis_1 == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_ravipulmonis_1 = n)->d11
+
+dat.urban %>% group_by(Species) %>% count(Mycoplasma_ravipulmonis_2) %>% filter(Mycoplasma_ravipulmonis_2 == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_ravipulmonis_2 = n)->a11
+
+dat.urban %>% group_by(Species) %>% count(Mycoplasma_microti) %>% filter(Mycoplasma_microti == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_microti = n)->d12
+dat.urban %>% group_by(Species) %>% count(Mycoplasma_insons) %>% filter(Mycoplasma_insons == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_insons = n)->d13
+dat.urban %>% group_by(Species) %>% count(Ehrlichia) %>% filter(Ehrlichia == 1) %>% dplyr::select(Species, n) %>% rename(Ehrlichia = n)->d14
+dat.urban %>% group_by(Species) %>% count(Chlamydia_1) %>% filter(Chlamydia_1 == 1) %>% dplyr::select(Species, n) %>% rename(Chlamydia_1 = n)->d15
+dat.urban %>% group_by(Species) %>% count(Chlamydia_2) %>% filter(Chlamydia_2 == 1) %>% dplyr::select(Species, n) %>% rename(Chlamydia_2 = n)->a15
+dat.urban %>% group_by(Species) %>% count(Rickettsia_1) %>% filter(Rickettsia_1 == 1) %>% dplyr::select(Species, n) %>% rename(Rickettsia_1 = n)->d16
+dat.urban %>% group_by(Species) %>% count(Rickettsia_2) %>% filter(Rickettsia_2 == 1) %>% dplyr::select(Species, n) %>% rename(Rickettsia_2 = n)->a16
+dat.urban %>% group_by(Species) %>% count(Streptobacillus_1) %>% filter(Streptobacillus_1 == 1) %>% dplyr::select(Species, n) %>% rename(Streptobacillus_1 = n)->d17
+dat.urban %>% group_by(Species) %>% count(Streptobacillus_2) %>% filter(Streptobacillus_2 == 1) %>% dplyr::select(Species, n) %>% rename(Streptobacillus_2 = n)->a17
+dat.urban %>% group_by(Species) %>% count(IFA_POX) %>% filter(IFA_POX == 1) %>% dplyr::select(Species, n) %>% rename(IFA_POX = n)->d18
+dat.urban %>% group_by(Species) %>% count(IFA_PUUV) %>% filter(IFA_PUUV == 1) %>% dplyr::select(Species, n) %>% rename(IFA_PUUV = n)->d19
+dat.urban %>% group_by(Species) %>% count(IFA_DOBRV) %>% filter(IFA_DOBRV == 1) %>% dplyr::select(Species, n) %>% rename(IFA_DOBRV = n)->d20
+dat.urban %>% group_by(Species) %>% count(IFA_LCMV) %>% filter(IFA_LCMV == 1) %>% dplyr::select(Species, n) %>% rename(IFA_LCMV = n)->d21
+dat.urban %>% group_by(Species) %>% count(Lepto) %>% filter(Lepto == 1) %>% dplyr::select(Species, n) %>% rename(Lepto = n)->d22
+dat.urban %>% select(Species) %>% unique() %>% left_join(d1) %>% left_join(d2) %>% left_join(d3) %>% left_join(d4)%>% left_join(d5) %>% left_join(d6)%>% left_join(d7) %>% left_join(a7) %>% left_join(d8)%>% left_join(d9) %>% left_join(d10)%>% left_join(d11) %>% left_join(a11) %>%left_join(d12)%>% left_join(d13) %>% left_join(d14)%>% left_join(d15) %>% left_join(a15) %>% left_join(d16)%>% left_join(a16)%>% left_join(d17) %>% left_join(a17) %>%left_join(d18)%>% left_join(d19) %>% left_join(d20)%>% left_join(d21) %>% left_join(d22) %>% drop_na(Species) %>% replace(is.na(.), 0) -> m2
+
+
+#colnames(m2)
+colnames(m2)[2] <- "Bartonella"
+colnames(m2)[3] <- "M.haemomuris"
+colnames(m2)[4] <- "M.coccoides"
+colnames(m2)[5] <- "Ca.Neoehrlichia"
+colnames(m2)[6] <- "Anaplasma"
+colnames(m2)[7] <- "Francisella"
+colnames(m2)[8] <- "Borrelia_1"
+colnames(m2)[9] <- "Borrelia_2"
+colnames(m2)[10] <- "Orientia"
+colnames(m2)[11] <- "Sarcocystidae"
+colnames(m2)[12] <- "M.penetrans"
+colnames(m2)[13] <- "M.ravipulmonis_1"
+colnames(m2)[14] <- "M.ravipulmonis_2"
+colnames(m2)[15] <- "M.microti"
+colnames(m2)[16] <- "M.insons"
+colnames(m2)[17] <- "Ehrlichia"
+colnames(m2)[18] <- "Chlamydia_1"
+colnames(m2)[19] <- "Chlamydia_2"
+colnames(m2)[20] <- "Rickettsia_1"
+colnames(m2)[21] <- "Rickettsia_2"
+colnames(m2)[22] <- "Streptobacillus_1"
+colnames(m2)[23] <- "Streptobacillus_2"
+colnames(m2)[24] <- "Orthopoxvirus"
+colnames(m2)[25] <- "Orthohanta_PUUV"
+colnames(m2)[26] <- "Orthohanta_DOBRV"
+colnames(m2)[27] <- "Mammarenavirus"
+colnames(m2)[28] <- "Leptospira"
+
+```
+
+```{r, fig.height=8}
+m.urban<-matrix.please(m2)
+
+#rename myodes into clethrionomys
+rownames(m.urban)[6]<- "Clethrionomys_glareolus"
+
+plotweb(m.urban, arrow="down",col.high = "#E34A33", col.low = "#E34A33",  text.rot=90, col.interaction =   "#fcdfd3",  labsize= 1.7, y.lim=c(-0.5,2.5))
+```
+
+```{r eval=FALSE, include=FALSE}
+
+#write to svg
+svg(file = "Web_urban.svg",
+    bg = "transparent", 
+    width = 14)
+par(family = "serif")
+
+plotweb(m.urban, arrow="down",col.high = "#E34A33", col.low = "#E34A33",  text.rot=90, col.interaction =   "#fcdfd3",  labsize= 1.7, y.lim=c(-0.5,2.5))
+dev.off()
+```
+
+
+
+
+### Forest network
+
+```{r}
+dat.forest %>% group_by(Species) %>% count(Bartonella) %>% filter(Bartonella == 1) %>% dplyr::select(Species, n) %>% rename(Bartonella = n) ->d1
+dat.forest %>% group_by(Species) %>% count(Mycoplasma_haemo) %>% filter(Mycoplasma_haemo == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_haemo = n)->d2
+dat.forest %>% group_by(Species) %>% count(Mycoplasma_coco) %>% filter(Mycoplasma_coco == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_coco = n)->d3
+dat.forest %>% group_by(Species) %>% count(Candidatus_Neoehrlichia) %>% filter(Candidatus_Neoehrlichia == 1) %>% dplyr::select(Species, n) %>% rename(Candidatus_Neoehrlichia = n)->d4
+dat.forest %>% group_by(Species) %>% count(Anaplasma) %>% filter(Anaplasma == 1) %>% dplyr::select(Species, n) %>% rename(Anaplasma = n)->d5
+dat.forest %>% group_by(Species) %>% count(Francisella) %>% filter(Francisella == 1) %>% dplyr::select(Species, n) %>% rename(Francisella = n)->d6
+dat.forest %>% group_by(Species) %>% count(Borrelia_1) %>% filter(Borrelia_1 == 1) %>% dplyr::select(Species, n) %>% rename(Borrelia_1 = n)->d7
+dat.forest %>% group_by(Species) %>% count(Borrelia_2) %>% filter(Borrelia_2 == 1) %>% dplyr::select(Species, n) %>% rename(Borrelia_2 = n)->a7
+dat.forest %>% group_by(Species) %>% count(Orientia) %>% filter(Orientia == 1) %>% dplyr::select(Species, n) %>% rename(Orientia = n)->d8
+dat.forest %>% group_by(Species) %>% count(Sarcocystidae) %>% filter(Sarcocystidae == 1) %>% dplyr::select(Species, n) %>% rename(Sarcocystidae = n)->d9
+dat.forest %>% group_by(Species) %>% count(Mycoplasma_penetrans) %>% filter(Mycoplasma_penetrans == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_penetrans = n)->d10
+dat.forest %>% group_by(Species) %>% count(Mycoplasma_ravipulmonis_1) %>% filter(Mycoplasma_ravipulmonis_1 == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_ravipulmonis_1 = n)->d11
+dat.forest %>% group_by(Species) %>% count(Mycoplasma_ravipulmonis_2) %>% filter(Mycoplasma_ravipulmonis_2 == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_ravipulmonis_2 = n)->a11
+dat.forest %>% group_by(Species) %>% count(Mycoplasma_microti) %>% filter(Mycoplasma_microti == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_microti = n)->d12
+dat.forest %>% group_by(Species) %>% count(Mycoplasma_insons) %>% filter(Mycoplasma_insons == 1) %>% dplyr::select(Species, n) %>% rename(Mycoplasma_insons = n)->d13
+dat.forest %>% group_by(Species) %>% count(Ehrlichia) %>% filter(Ehrlichia == 1) %>% dplyr::select(Species, n) %>% rename(Ehrlichia = n)->d14
+dat.forest %>% group_by(Species) %>% count(Chlamydia_1) %>% filter(Chlamydia_1 == 1) %>% dplyr::select(Species, n) %>% rename(Chlamydia_1 = n)->d15
+dat.forest %>% group_by(Species) %>% count(Chlamydia_2) %>% filter(Chlamydia_2 == 1) %>% dplyr::select(Species, n) %>% rename(Chlamydia_2 = n)->a15
+dat.forest %>% group_by(Species) %>% count(Rickettsia_1) %>% filter(Rickettsia_1 == 1) %>% dplyr::select(Species, n) %>% rename(Rickettsia_1 = n)->d16
+dat.forest %>% group_by(Species) %>% count(Rickettsia_2) %>% filter(Rickettsia_2 == 1) %>% dplyr::select(Species, n) %>% rename(Rickettsia_2 = n)->a16
+dat.forest %>% group_by(Species) %>% count(Streptobacillus_1) %>% filter(Streptobacillus_1 == 1) %>% dplyr::select(Species, n) %>% rename(Streptobacillus_1 = n)->d17
+dat.forest %>% group_by(Species) %>% count(Streptobacillus_2) %>% filter(Streptobacillus_2 == 1) %>% dplyr::select(Species, n) %>% rename(Streptobacillus_2 = n)->a17
+dat.forest %>% group_by(Species) %>% count(IFA_POX) %>% filter(IFA_POX == 1) %>% dplyr::select(Species, n) %>% rename(IFA_POX = n)->d18
+dat.forest %>% group_by(Species) %>% count(IFA_PUUV) %>% filter(IFA_PUUV == 1) %>% dplyr::select(Species, n) %>% rename(IFA_PUUV = n)->d19
+dat.forest %>% group_by(Species) %>% count(IFA_DOBRV) %>% filter(IFA_DOBRV == 1) %>% dplyr::select(Species, n) %>% rename(IFA_DOBRV = n)->d20
+dat.forest %>% group_by(Species) %>% count(IFA_LCMV) %>% filter(IFA_LCMV == 1) %>% dplyr::select(Species, n) %>% rename(IFA_LCMV = n)->d21
+dat.forest %>% group_by(Species) %>% count(Lepto) %>% filter(Lepto == 1) %>% dplyr::select(Species, n) %>% rename(Lepto = n)->d22
+dat.forest %>% select(Species) %>% unique() %>% left_join(d1) %>% left_join(d2) %>% left_join(d3) %>% left_join(d4)%>% left_join(d5) %>% left_join(d6)%>% left_join(d7) %>% left_join(a7) %>% left_join(d8)%>% left_join(d9) %>% left_join(d10)%>% left_join(d11) %>% left_join(a11) %>%left_join(d12)%>% left_join(d13) %>% left_join(d14)%>% left_join(d15) %>% left_join(a15) %>% left_join(d16)%>% left_join(a16)%>% left_join(d17) %>% left_join(a17) %>%left_join(d18)%>% left_join(d19) %>% left_join(d20)%>% left_join(d21) %>% left_join(d22) %>% drop_na(Species) %>% replace(is.na(.), 0) -> m2
+
+#colnames(m2)
+colnames(m2)[2] <- "Bartonella"
+colnames(m2)[3] <- "M.haemomuris"
+colnames(m2)[4] <- "M.coccoides"
+colnames(m2)[5] <- "Ca.Neoehrlichia"
+colnames(m2)[6] <- "Anaplasma"
+colnames(m2)[7] <- "Francisella"
+colnames(m2)[8] <- "Borrelia_1"
+colnames(m2)[9] <- "Borrelia_2"
+colnames(m2)[10] <- "Orientia"
+colnames(m2)[11] <- "Sarcocystidae"
+colnames(m2)[12] <- "M.penetrans"
+colnames(m2)[13] <- "M.ravipulmonis_1"
+colnames(m2)[14] <- "M.ravipulmonis_2"
+colnames(m2)[15] <- "M.microti"
+colnames(m2)[16] <- "M.insons"
+colnames(m2)[17] <- "Ehrlichia"
+colnames(m2)[18] <- "Chlamydia_1"
+colnames(m2)[19] <- "Chlamydia_2"
+colnames(m2)[20] <- "Rickettsia_1"
+colnames(m2)[21] <- "Rickettsia_2"
+colnames(m2)[22] <- "Streptobacillus_1"
+colnames(m2)[23] <- "Streptobacillus_2"
+colnames(m2)[24] <- "Orthopoxvirus"
+colnames(m2)[25] <- "Orthohanta_PUUV"
+colnames(m2)[26] <- "Orthohanta_DOBRV"
+colnames(m2)[27] <- "Mammarenavirus"
+colnames(m2)[28] <- "Leptospira"
+```
+
+
+
+```{r, fig.height = 8}
+m.forest<-matrix.please(m2)
+
+#rename Myodes into clethrionomys
+rownames(m.forest)[2]<- "Clethrionomys_glareolus"
+
+plotweb(m.forest, arrow="down",col.high = "#006837", col.low = "#006837",  text.rot=90, col.interaction = "#bff3d7",  labsize= 1.7, y.lim=c(-0.5,2.5))
+
+```
+
+
+```{r eval=FALSE, include=FALSE}
+#write to svg
+svg(file = "Web_forest.svg",
+    bg = "transparent", 
+    width = 14)
+par(family = "serif")
+
+plotweb(m.forest, arrow="down",col.high = "#006837", col.low = "#006837",  text.rot=90, col.interaction = "#bff3d7",  labsize= 1.7, y.lim=c(-0.5,2.5))
+dev.off()
+```
+
+
+# Network STATISTICS 
+
+### Urban
+
+```{r}
+m.urban.out <-networklevel(m.urban)
+m.urban.out[c(1, 7, 11, 20, 14, 15)]
+```
+
+
+
+```{r, fig.height = 8}
+
+mod.urban <- computeModules(m.urban,method="DormannStrauss")
+
+plotModuleWeb(mod.urban, labsize = 1.0)
+
+#printoutModuleInformation(mod.urban)  #4 modules
+
+```
+
+```{r eval=FALSE, include=FALSE}
+#write to svg
+svg(file = "Mod_urban.svg",
+    bg = "transparent", height = 4.5, width=6.5)
+par(family = "serif")
+plotModuleWeb(mod.urban, labsize = 1.0)
+dev.off()
+```
+
+### Forest
+
+```{r}
+m.forest.out <-networklevel(m.forest)
+m.forest.out[c(1, 7, 11, 20, 14, 15)]
+```
+
+
+
+```{r, fig.height = 8}
+
+mod.forest <- computeModules(m.forest,method="DormannStrauss")
+
+plotModuleWeb(mod.forest, labsize = 1.0)
+
+#printoutModuleInformation(mod.forest)  #4 modules
+
+```
+```{r}
+#write to svg
+svg(file = "Mod_forest.svg",
+    bg = "transparent", height = 4.5, width=6.5)
+par(family = "serif")
+plotModuleWeb(mod.forest, labsize = 1.0)
+dev.off()
+```
+
+### Stats per site
+
+Create table with statistics per locality
+
+```{r}
+output.stat <- matrix(, nrow = 27, ncol = 6)
+colnames(output.stat)<-c("C", "ModQ", "wNODF", "H'2", "linkage density", "weighted connectance")
+rownames(output.stat)<- c('FRFGLA','FRFMIG','FRFGRI','GEFREI','FRFCOR','GEFKUE','GEFVOLL',
+                          'IRFDWW','POFMLD', 'IRFSJR', 'GEFBUE', 'IRFF1L', 'IRFF3L', 'IRFKTK',
+                          'IRFMAK','IRPDGW','BEFZEV','IRPMNK','GEFWIN','GEPBGP','FRPDLL','BEFFO5'
+                          ,'BEPFO6','BEFPLA','FRPLTO','BEPRIV','BEPANT')
+```
+
+
+```{r message=FALSE, warning=FALSE}
+#net.site('POFMLD')[c(1, 7, 11, 20)]
+
+output.stat[1,]<-net.site('FRFGLA')[c(1, 7, 11, 20)]
+output.stat[2,]<-net.site('FRFMIG')[c(1, 7, 11, 20)]
+output.stat[3,]<-net.site('FRFGRI')[c(1, 7, 11, 20)]
+output.stat[4,]<-net.site('GEFREI')[c(1, 7, 11, 20)]
+output.stat[5,]<-net.site('FRFCOR')[c(1, 7, 11, 20)]
+output.stat[6,]<-net.site('GEFKUE')[c(1, 7, 11, 20)]
+output.stat[7,]<-net.site('GEFVOLL')[c(1, 7, 11, 20)]
+output.stat[8,]<-net.site('IRFDWW')[c(1, 7, 11, 20)]
+output.stat[9,]<-net.site('POFMLD')[c(1, 7, 11, 20)]
+output.stat[10,]<-net.site('IRFSJR')[c(1, 7, 11, 20)]
+output.stat[11,]<-net.site('GEFBUE')[c(1, 7, 11, 20)]
+output.stat[12,]<-net.site('IRFF1L')[c(1, 7, 11, 20)]
+output.stat[13,]<-net.site('IRFF3L')[c(1, 7, 11, 20)]
+output.stat[14,]<-net.site('IRFKTK')[c(1, 7, 11, 20)]
+output.stat[15,]<-net.site('IRFMAK')[c(1, 7, 11, 20)]
+output.stat[16,]<-net.site('IRPDGW')[c(1, 7, 11, 20)]
+output.stat[17,]<-net.site('BEFZEV')[c(1, 7, 11, 20)]
+output.stat[18,]<-net.site('IRPMNK')[c(1, 7, 11, 20)]
+output.stat[19,]<-net.site('GEFWIN')[c(1, 7, 11, 20)]
+output.stat[20,]<-net.site('GEPBGP')[c(1, 7, 11, 20)]
+output.stat[21,]<-net.site('FRPDLL')[c(1, 7, 11, 20)]
+output.stat[22,]<-net.site('BEFFO5')[c(1, 7, 11, 20)]
+output.stat[23,]<-net.site('BEPFO6')[c(1, 7, 11, 20)]
+output.stat[24,]<-net.site('BEFPLA')[c(1, 7, 11, 20)]
+output.stat[25,]<-net.site('FRPLTO')[c(1, 7, 11, 20)]
+output.stat[26,]<-net.site('BEPRIV')[c(1, 7, 11, 20)]
+output.stat[27,]<-net.site('BEPANT')[c(1, 7, 11, 20)]
+
+```
+
+```{r}
+output.stat
+```
+```{r}
+dat |> filter(Habitat == 'Urban Park') |> select(Site_Code) |> distinct()
+dat |> filter(Habitat == 'Forest') |> select(Site_Code) |> distinct() |> count()
+```
+
+
+Output for the urban sites in France/Belgium/Germany
+
+Specialisation
+```{r}
+output.stat[c(20, 21,23, 25, 26,27), 4]
+#mean(output.stat[c(20, 21,23, 25, 26,27), 1])
+#mean(output.stat[c(20, 21,23, 25, 26,27), 4])
+```
+Nestedness
+```{r}
+output.stat[c(20, 21,23, 25, 26,27), 3]
+```
+Modularity
+```{r}
+output.stat[c(20, 21,23, 25, 26,27), 2]
+```
+Connectance
+```{r}
+output.stat[c(20, 21,23, 25, 26,27), 1]
+```
+
+
+```{r}
+dat2 |> filter(Site_Code == 'FRPLTO' | Site_Code == 'BEPANT' ) |> select(Species) |> distinct() #absence of myodes glareolus ~ higher degree of specialisation, lower nestedness
+```
+
+```{r}
+test<-net.matrix('BEPRIV') #change for site name to plot different network
+plotweb(test, arrow="down",col.high = "#E34A33", col.low = "#E34A33",  text.rot=90, col.interaction =   "#fcdfd3",  labsize= 1.7, y.lim=c(-2,3))
+```
+
+
+
+
+
+```{r}
+sd(output.stat[c(21,23, 25, 26,27), 1])
+```
+
+Output for the forested sites in France/Belgium
+
+```{r}
+output.stat[c(4,6,7,11,19, 17,22, 24, 1,2,3,5), 4]
+#mean(output.stat[c(17,22, 24, 1,2,3,4,5,6,7,9,11), 1])
+```
+```{r}
+dat2 |> filter(Site_Code == 'GEFVOLL' | Site_Code == 'GEFKUE' ) |> select(Species) |> distinct() #absence of myodes glareolus ~ higher degree of specialisation
+```
+
+```{r}
+test<-net.matrix('FRFGRI')
+plotweb(test, arrow="down",col.high = "#006837", col.low = "#006837",  text.rot=90, col.interaction = "#bff3d7",  labsize= 1.7, y.lim=c(-1.5,2.5))
+
+?plotweb
+```
+
+```{r}
+sd(output.stat[c(17,22, 24, 1,2,3,5), 1])
+```
+
+
+Mean of Specialisation: URBAN - FOREST 
+```{r}
+mean(output.stat[c(20, 21,23, 25, 26,27), 4])-mean(output.stat[c(4,6,7,11,19, 17,22, 24, 1,2,3,5), 4])
+```
+
+```{r}
+test<-net.matrix('IRFMAK')
+plotweb(test, labsize = 1.7, col.high = "lightskyblue", col.low = "lightskyblue" , col.interaction =  "aliceblue" )
+```
+
+
+```{r eval=FALSE, include=FALSE}
+meta
+output.stat
+```
+```{r}
+plot(output.stat[,1], output.stat[,4], xlab='connectance', ylab='specialisation')
+```
+```{r}
+plot(output.stat[,3], output.stat[,4], xlab='weighted NODF', ylab='specialisation')
+```
+
+```{r}
+plot(output.stat[,2], output.stat[,4], xlab='Modularity Q' , ylab='specialisation')
+```
+
+### NULL models & statistical test
+
+#### Habitat differences: Site networks for Be & Fr & Ge 
+
+Note that the differences in network statistics by habitat were calculated using mainland data from Be, Fr and Ge only as Ireland is a special case given it is an island with a colonizing host speciesand Poland had one habitat only with restricted pathogen detection.
+
+
+```{r message=FALSE, warning=FALSE}
+
+#forest
+FRFGLA.for<-net.matrix('FRFGLA')
+FRFMIG.for<-net.matrix('FRFMIG')
+FRFGRI.for<-net.matrix('FRFGRI')
+GEFREI.for<-net.matrix('GEFREI')
+FRFCOR.for<-net.matrix('FRFCOR')
+GEFKUE.for<-net.matrix('GEFKUE')
+GEFVOLL.for<-net.matrix('GEFVOLL')
+IRFDWW.for<-net.matrix('IRFDWW')
+#POFMLD.out<-net.matrix('POFMLD')
+IRFSJR.for<-net.matrix('IRFSJR')
+GEFBUE.for<-net.matrix('GEFBUE')
+IRFF1L.for<-net.matrix('IRFF1L')
+IRFF3L.for<-net.matrix('IRFF3L')
+IRFKTK.for<-net.matrix('IRFKTK')
+IRFMAK.for<-net.matrix('IRFMAK')
+BEFZEV.for<-net.matrix('BEFZEV')
+GEFWIN.for<-net.matrix('GEFWIN')
+BEFFO5.for<-net.matrix('BEFFO5')
+BEFPLA.for<-net.matrix('BEFPLA')
+
+#urban
+GEPBGP.urb<-net.matrix('GEPBGP')
+FRPDLL.urb<-net.matrix('FRPDLL')
+FRPLTO.urb<-net.matrix('FRPLTO')
+BEPFO6.urb<-net.matrix('BEPFO6')
+BEPRIV.urb<-net.matrix('BEPRIV')
+BEPANT.urb<-net.matrix('BEPANT')
+IRPDGW.urb<-net.matrix('IRPDGW')
+IRPMNK.urb<-net.matrix('IRPMNK')
+```
+
+
+```{r}
+plotweb(FRFGLA.for, labsize = 1.7, col.high = "lightskyblue", col.low = "lightskyblue" , col.interaction =  "aliceblue" )
+```
+
+
+```{r}
+weblist <- lapply(c("BEPANT.urb", "BEPRIV.urb", "BEPFO6.urb", "FRPLTO.urb", "FRPDLL.urb", "GEPBGP.urb",
+                    "FRFGLA.for", "FRFMIG.for","FRFGRI.for","FRFCOR.for","BEFZEV.for","BEFFO5.for","BEFPLA.for", "GEFBUE.for","GEFVOLL.for","GEFREI.for", "GEFBUE.for", "GEFWIN.for"), get)
+meandiff <- function(webs){
+ obs <- sapply(webs, networklevel, index="modularity") #"connectance" "weighted NODF",  "modularity", "H2",  "linkage density"
+ mean(obs[1:6]) - mean(obs[7:18])
+ }
+(observed <- meandiff(weblist))
+```
+
+Note that this is mean of URBAN statistic - mean of FOREST statistic, positive values mean larger values on average in URBAN networks.
+
+```{r}
+res <- nulmodel_r2d(weblist, 5000)
+```
+
+
+```{r}
+hist(res)
+abline(v = observed, col="red", lwd=2)
+```
+
+
+```{r}
+#if the red line is on the right, ie observed > mean(res) from the histogram, should be >
+#if the red line is situated on the left, should be <
+ifelse(observed < mean(res), (sum(res < observed)/length(res) * 2), (sum(res < observed)/length(res) * 2)) # *2 for two-tailed test
+```

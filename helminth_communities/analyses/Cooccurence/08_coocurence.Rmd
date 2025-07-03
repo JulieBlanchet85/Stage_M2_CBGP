@@ -1,0 +1,134 @@
+---
+title: "08_coocurence"
+output: html_document
+---
+
+# CO-OCCURENCE
+
+### Loading
+
+```{r}
+t <-read.csv(here::here("GLMM/data/derived_data/20250522_jd_complet.csv"), sep = ",")
+```
+
+```{r}
+## Pour définir les fonctions 
+source("SCN.txt")
+source("FctTestScreenENV.txt")
+```
+
+```{r}
+## Convertion en tableau de présence-absence
+colonnes_parasites <- c("syphacia_stroma", "heligmosomoides_polygyrus", "hymenolepis_hiberna","syphacia_frederici","hydatigera_parva","aspiculuris_tetraptera","skrjabinotaenia_lobata", "trichuris")
+t[colonnes_parasites] <- lapply(t[colonnes_parasites], function(x) ifelse(x > 0, 1, 0))
+
+```
+
+### Co-occurence
+
+```{r}
+pathos<-c( "syphacia_stroma","heligmosomoides_polygyrus","syphacia_frederici")
+extfacs<- c("habitat1")
+```
+
+```{r}
+##Calcul du nombre de fois où on trouve chaque combinaison
+
+test1 <- t[,  pathos]
+res_scn <- SCN(test1, pathos)
+res_scn
+
+```
+
+```{r}
+
+colnames(res_scn)[1] <- "combinaison"
+decode_comb <- function(comb_vec) {
+  sapply(comb_vec, function(comb) {
+    comps <- strsplit(as.character(comb), split = "")[[1]]
+    paste0(
+      pathos[1], "=", comps[1], ", ",
+      pathos[2], "=", comps[2], ", ",
+      pathos[3], "=", comps[3]
+    )
+  })
+}
+
+# Appliquer la fonction sur toutes les combinaisons
+res_scn$legend <- sapply(res_scn$combinaison, decode_comb)
+
+# Déplace la dernière colonne (ici "legend") en deuxième position
+res_scn <- res_scn[, c(1, ncol(res_scn), 2:(ncol(res_scn)-1))]
+
+# Réorganiser les colonnes : afficher la légende en premier
+print(res_scn)
+```
+
+```{r}
+## Enveloppe
+test2 <-  t[ , c("syphacia_stroma", "heligmosomoides_polygyrus","syphacia_frederici")]
+
+test2 <- as.matrix(test2)
+```
+
+```{r}
+FctTestScreenENV(test2)
+# 🔴 [1] Nombre de combinaison significative
+# 🔴 [2] p-value minimale trouvée
+# 🔴 [3] Les combinaisons binaires représentées en notation décimale (par exemple, 111 = infection aux 3 parasites, 100 = infection uniquement au 1er)
+# 🔴 [4] vecteur indiquant si chaque combinaison est significative (1 = oui, 0 = non)
+# 🔴 [5] p-values associées à chaque combinaison 
+# 🔴 [6] Fréquences observées pour chaque combinaison
+# 🔴 [7] Limite supérieure de l’intervalle de confiance simulé sous H0 (95%)
+# 🔴 [8] Limite inférieure de l’intervalle de confiance simulé sous H0 (95%)
+
+# HO c'est pas de combinaison, distribution aléatoire
+```
+
+```{r}
+## Plot enveloppe
+res <- FctTestScreenENV(test2)
+# Extraire les données
+x <- 1:length(res[[6]])  # abscisses = numéro de combinaison
+obs <- res[[6]]          # valeurs observées
+sup <- res[[7]]          # IC95% sup
+inf <- res[[8]]          # IC95% inf
+
+# plot
+plot(x, obs, pch = 1, col = "red", ylim = c(0, max(sup) + 10),
+     xlab = "Numéro de combinaison", ylab = "Nombre d'hôtes", main = "Test de co-occurrence")
+
+lines(x, sup, col = "green")
+lines(x, inf, col = "blue")
+
+```
+
+```{r}
+## Plot enveloppe
+res <- FctTestScreenENV(test2)
+
+# Extraire les données
+x <- 1:length(res[[6]])  # abscisses = numéro de combinaison
+obs <- res[[6]]          # valeurs observées
+sup <- res[[7]]          # IC95% supérieur
+inf <- res[[8]]          # IC95% inférieur
+
+# Créer le graphique
+plot(x, obs, pch = 1, col = "red", ylim = c(0, max(sup) + 10),
+     xlab = "Numéro de combinaison", ylab = "Nombre d'hôtes", 
+     main = "Test de co-occurrence")
+
+# Ajouter les courbes des intervalles de confiance
+lines(x, sup, col = "green")
+lines(x, inf, col = "blue")
+
+# Ajouter la légende
+legend("topright", 
+       legend = c("IC supérieur (95%)", 
+                  "IC inférieur (95%)"), 
+       col = c("green", "blue"), 
+       pch = c(NA, NA), 
+       lty = c(1, 1), 
+       bty = "n")
+
+```

@@ -1,0 +1,54 @@
+---
+title: "00_construction_fiche_dissection"
+output: html_document
+---
+
+# Construction fiche de dissection
+
+Construction de la fiche dissection complete après avoir donné une identification spécifique de chaque helminthe du genre *Syphacia* (*S. stroma, S. frederici*)
+
+```{r, include=FALSE}
+library(openxlsx)
+library(dplyr)
+library(tidyr)
+```
+
+## Chargement des données
+
+Chargement de la feuille avec lles morphotypes-hôtes et l'espèce finale associée
+
+```{r}
+df <- openxlsx::read.xlsx(here::here("GLMM/data/raw_data/20250522_correspondance_morpho_esp .xlsx"))
+```
+
+## Transformation
+
+Transformation en un tableau avec 3 colonnes (code_rongeur, espèce et effectif)
+
+```{r}
+df$code_rongeur2 <- sub("_WO(-\\d+)?$", "", df$code_rongeur)
+
+df$nombre <- as.numeric(df$nombre)
+df_grouped <- df %>%
+  group_by(code_rongeur2, espece) %>%
+  summarise(effectif_total = sum(nombre, na.rm = TRUE), .groups = "drop")
+
+## Un NA pour "sans étiquette" dans "effectif" mais c'est normal
+```
+
+```{r}
+## Créer un tableau avec en ligne le numéro code du rongeur et en colonne les effectifs des différents 
+df_wide <- df %>%
+  group_by(code_rongeur2, espece) %>%
+  summarise(effectif = sum(nombre, na.rm = TRUE), .groups = "drop") %>%
+  tidyr::pivot_wider(
+    names_from = espece,
+    values_from = effectif,
+    values_fill = 0  # Remplit les cases vides avec 0
+  )
+
+```
+
+```{r}
+write.csv(df_wide, here::here("data/derived_data/20250522_fiche_dissection_inferee.csv"), row.names = FALSE, quote = TRUE)
+```

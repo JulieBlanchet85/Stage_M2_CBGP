@@ -1,0 +1,15 @@
+"0","library(MuMIn) 
+library(MuMIn) 
+library(lme4) 
+"
+"2","G3;Le chargement a nécessité le package : Matrix
+g"
+"2","G3;
+Attachement du package : ‘lme4’
+
+g"
+"2","G3;L'objet suivant est masqué depuis ‘package:nlme’:
+
+    lmList
+
+g"

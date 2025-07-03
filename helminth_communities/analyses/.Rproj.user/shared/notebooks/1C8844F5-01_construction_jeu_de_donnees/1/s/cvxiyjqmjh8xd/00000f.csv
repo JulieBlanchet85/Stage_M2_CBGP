@@ -1,0 +1,30 @@
+"0","## Package loading ----"
+"0","library (""dplyr"")"
+"0","library(""here"")"
+"2","G3;here() starts at C:/Users/blanchej/Documents/Julie/Helminths_communities/helminthes_apres_bm
+g"
+"0","#install.packages(""openxlsx"")"
+"0","library(openxlsx)"
+"0","#install.packages(""tidyverse"")"
+"0","#install.packages(""smatr"")"
+"0","library(tidyverse)"
+"2","── [1mAttaching core tidyverse packages[22m ───────────────────────────────────────────────────────────────── tidyverse 2.0.0 ──
+[32m✔[39m [34mforcats  [39m 1.0.0     [32m✔[39m [34mstringr  [39m 1.5.1
+[32m✔[39m [34mlubridate[39m 1.9.4     [32m✔[39m [34mtibble   [39m 3.2.1
+[32m✔[39m [34mpurrr    [39m 1.0.4     [32m✔[39m [34mtidyr    [39m 1.3.1
+[32m✔[39m [34mreadr    [39m 2.1.5     
+"
+"2","── [1mConflicts[22m ─────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
+[31m✖[39m [34mdplyr[39m::[32mcollapse()[39m masks [34mnlme[39m::collapse()
+[31m✖[39m [34mtidyr[39m::[32mexpand()[39m   masks [34mMatrix[39m::expand()
+[31m✖[39m [34mdplyr[39m::[32mfilter()[39m   masks [34mstats[39m::filter()
+[31m✖[39m [34mdplyr[39m::[32mlag()[39m      masks [34mstats[39m::lag()
+[31m✖[39m [34mtidyr[39m::[32mpack()[39m     masks [34mMatrix[39m::pack()
+[31m✖[39m [34mdplyr[39m::[32mrecode()[39m   masks [34mcar[39m::recode()
+[31m✖[39m [34mdplyr[39m::[32mselect()[39m   masks [34mMASS[39m::select()
+[31m✖[39m [34mpurrr[39m::[32msome()[39m     masks [34mcar[39m::some()
+[31m✖[39m [34mtidyr[39m::[32munpack()[39m   masks [34mMatrix[39m::unpack()
+[36mℹ[39m Use the ]8;;http://conflicted.r-lib.org/conflicted package]8;; to force all conflicts to become errors
+"
+"0","library(readxl)"
+"0","library(smatr)"

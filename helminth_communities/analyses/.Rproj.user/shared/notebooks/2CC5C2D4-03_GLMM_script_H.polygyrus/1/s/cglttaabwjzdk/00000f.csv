@@ -1,0 +1,28 @@
+"0","## Intensité"
+"0","summary(ModelSelected_intensite_glmm) "
+"1"," Family: nbinom2  ( log )
+Formula:          heligmosomoides_polygyrus ~ habitat1 + poids_z + SMI_z + (1 |      numero_ligne)
+Data: t_infectes
+
+      AIC       BIC    logLik -2*log(L)  df.resid 
+    656.2     674.1    -321.1     642.2        89 
+
+Random effects:
+
+Conditional model:
+ Groups       Name        Variance Std.Dev.
+ numero_ligne (Intercept) 0.2143   0.4629  
+Number of obs: 96, groups:  numero_ligne, 36
+
+Dispersion parameter for nbinom2 family (): 1.49 
+
+Conditional model:
+             Estimate Std. Error z value Pr(>|z|)    
+(Intercept)    1.1271     0.3202   3.520 0.000431 ***
+habitat1haie   1.2712     0.3667   3.467 0.000527 ***
+habitat1pins   1.0926     0.4708   2.321 0.020310 *  
+poids_z        0.6409     0.1339   4.786  1.7e-06 ***
+SMI_z         -0.3729     0.1203  -3.099 0.001943 ** 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+"

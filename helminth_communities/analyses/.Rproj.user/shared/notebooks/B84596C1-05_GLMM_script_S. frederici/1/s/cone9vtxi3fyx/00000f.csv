@@ -1,0 +1,37 @@
+"0","## Intensité"
+"0","summary(ModelSelected_intensite_glmm) "
+"1","Generalized linear mixed model fit by maximum likelihood (Laplace Approximation) ['glmerMod']
+ Family: poisson  ( log )
+Formula: syphacia_frederici ~ sexe + SMI_z + poids_z + richesse_spe_AP_z +      (1 | code_rongeur)
+   Data: t_infectes
+Control: glmerControl(optimizer = ""bobyqa"", optCtrl = list(maxfun = 20000))
+
+      AIC       BIC    logLik -2*log(L)  df.resid 
+    297.7     307.5    -142.9     285.7        32 
+
+Scaled residuals: 
+     Min       1Q   Median       3Q      Max 
+-0.62324 -0.25795 -0.07458  0.12594  0.19526 
+
+Random effects:
+ Groups       Name        Variance Std.Dev.
+ code_rongeur (Intercept) 1.923    1.387   
+Number of obs: 38, groups:  code_rongeur, 38
+
+Fixed effects:
+                  Estimate Std. Error z value Pr(>|z|)    
+(Intercept)        1.91409    0.36249   5.280 1.29e-07 ***
+sexeM              0.09986    0.49775   0.201    0.841    
+SMI_z              0.01338    0.27647   0.048    0.961    
+poids_z            0.22920    0.25978   0.882    0.378    
+richesse_spe_AP_z -0.22639    0.25972  -0.872    0.383    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Correlation of Fixed Effects:
+            (Intr) sexeM  SMI_z  pods_z
+sexeM       -0.748                     
+SMI_z       -0.067  0.123              
+poids_z      0.000  0.074 -0.198       
+rchss_s_AP_  0.217 -0.275 -0.142 -0.280
+"

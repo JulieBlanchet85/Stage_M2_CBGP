@@ -1,0 +1,5 @@
+"0","df <-read.csv(here::here(""data/derived_data/20250519_jd_complet.csv""), sep = "","")"
+"0",""
+"0","# Séparation des blocs de données"
+"0","parasites <- df[, c(""syphacia_ant"", ""heligmosomoides_polygyrus"", ""hymenolepis_hiberna"",""syphacia_caecum"", ""syphacia_post"",""hydatigera_parva"",""aspiculuris_tetraptera"",""skrjabinotaenia_lobata"", ""trichuris"")]"
+"0","infos <- df[, c(""demogroup"",""sexe"", ""SMI"", ""poids"", ""longueur_tete_corps"", ""richesse_spe_AP"", ""habitat1"", ""habitat2"")]"

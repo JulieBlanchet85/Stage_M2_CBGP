@@ -1,0 +1,2 @@
+"0","##GLMM avec donnees intensite"
+"0","glmm_intensite<-glmer(syphacia_frederici~sexe+poids_z+SMI_z+habitat1+richesse_spe_AP_z+(1|numero_ligne),data=t_infectes,family=poisson(link=""log""),na.action=""na.fail"",control=glmerControl(optimizer = ""bobyqa"", optCtrl = list(maxfun = 20000)))"

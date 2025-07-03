@@ -1,0 +1,112 @@
+---
+title: "comp_syph"
+output: html_document
+---
+
+# Comparaisons esp de Syph trouvés
+
+```{r}
+library(openxlsx)
+library(dplyr)
+```
+
+```{r}
+t <-openxlsx::read.xlsx(here::here("sequences/comp_syph/20250520_correspondance_morpho_SeqSyph.xlsx"))
+```
+
+## Calcul du pourcentage de fois où espèce qui ressort avec arbre est associé à chaque morphotype
+
+Avec les groupes de syphacia stroma différents
+
+```{r}
+##Bootstrap de moins de 70 pour les différents S. stroma
+#Enleve les ligne avec indéterminé et celle ou H. polygyrus est détecté comme syph
+t <- t %>%
+  slice(-c(2, 70,92))
+
+# On enlève les NA 
+t_clean <- t[!is.na(t$esp_selon_arbre_phylo) & !is.na(t$morphotype), ]
+
+# On compte les combinaisons
+table_combi <- as.data.frame(table(t_clean$esp_selon_arbre_phylo, t_clean$morphotype))
+colnames(table_combi) <- c("esp_selon_arbre_phylo", "morphotype", "count")
+
+# On calcule le total pour chaque esp_selon_arbre_phylo
+totaux <- aggregate(count ~ esp_selon_arbre_phylo, data = table_combi, sum)
+colnames(totaux) <- c("esp_selon_arbre_phylo", "total")
+
+# On fusionne pour calculer le pourcentage
+table_combi <- merge(table_combi, totaux, by = "esp_selon_arbre_phylo")
+table_combi$percentage <- 100 * table_combi$count / table_combi$total
+
+# Résultat : table_combi contient les pourcentages d'association
+print(table_combi)
+
+```
+
+En regroupant les groupes de syphacia stroma
+
+```{r}
+### Bootstrap de plus de 70
+# Étape 1 : Nettoyage - on garde que les lignes sans NA
+t_clean <- t[!is.na(t$esp_selon_arbre_phylo) & !is.na(t$morphotype), ]
+
+# Étape 2 : Regrouper les stroma1, stroma2, stroma3, etc. en "Syphacia_stroma"
+t_clean$esp_selon_arbre_phylo <- gsub("^Syphacia_stroma[0-9]+$", "Syphacia_stroma", t_clean$esp_selon_arbre_phylo)
+
+# Étape 3 : Tableau de fréquences
+table_combi <- as.data.frame(table(t_clean$esp_selon_arbre_phylo, t_clean$morphotype))
+colnames(table_combi) <- c("esp_selon_arbre_phylo", "morphotype", "count")
+
+# Étape 4 : Totaux par esp_selon_arbre_phylo
+totaux <- aggregate(count ~ esp_selon_arbre_phylo, data = table_combi, sum)
+colnames(totaux) <- c("esp_selon_arbre_phylo", "total")
+
+# Étape 5 : Fusion et calcul du pourcentage
+table_combi <- merge(table_combi, totaux, by = "esp_selon_arbre_phylo")
+table_combi$percentage <- 100 * table_combi$count / table_combi$total
+
+# Résultat final
+print(table_combi)
+
+```
+
+```{r}
+# Cas 1 : Syphacia_stroma ≠ Syphacia_ant en morphotype
+mismatch_stroma <- t_clean %>%
+  filter(esp_selon_arbre_phylo == "Syphacia_stroma"& morphotype != "syphacia_(ant)")
+
+# Cas 2 : Syphacia_frederici ≠ Syphacia_caecum ou Syphacia_post
+mismatch_frederici <- t_clean %>%
+  filter(esp_selon_arbre_phylo == "Syphacia_frederici"& morphotype == "syphacia_(ant)")
+
+# Fusionner les deux cas en un seul data frame
+discordances <- bind_rows(mismatch_stroma, mismatch_frederici)
+
+# Affichage
+print(discordances)
+```
+
+## Espèce de syphacia par rongeur
+
+```{r}
+# Créer une colonne code_rongeur_unique
+t_clean <- t_clean %>%
+  mutate(code_rongeur_unique = sub("_WO.*", "", code_rongeur))
+
+# Puis on compte le nombre d'esp_selon_arbre_phylo distinct par individu
+esp_par_individu <- t_clean %>%
+  group_by(code_rongeur_unique) %>%
+  summarise(
+    n_esp = n_distinct(esp_selon_arbre_phylo),
+    n_de_morphotype = n()   # nombre total de lignes pour cet individu
+  ) %>%
+  mutate(multiple_esp = n_esp > 1) # On regarde combien d'individus ont plus d'une esp_selon_arbre_phylo associée
+
+print(esp_par_individu)
+
+# Par exemple, pour voir uniquement ceux avec plusieurs espèces différentes :
+plusieurs_esp <- filter(esp_par_individu, multiple_esp == TRUE)
+print(plusieurs_esp)
+
+```

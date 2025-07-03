@@ -1,0 +1,6 @@
+"0","##Calcul de L0 = moyenne des longueurs sans les femelles gestantes"
+"0","L0 <- mean(donnees_non_gestantes$longueur_tete_corps)"
+"0","L0"
+"1","[1] 89.91
+"
+"0","# 🔴 89.91"

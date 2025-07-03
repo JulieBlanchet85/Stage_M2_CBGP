@@ -1,0 +1,19 @@
+"0","#b_SMA sans les femelles gestantes"
+"0",""
+"0","donnees_non_gestantes <- fiche_dissection %>%"
+"0","  filter(gestation == ""non"")"
+"0",""
+"0","### Régression SMA"
+"0","sma_model <- smatr::sma(log(poids) ~ log(longueur_tete_corps), data = donnees_non_gestantes)"
+"0",""
+"0","### Extraction du coefficient de pente"
+"0","coef(sma_model)"
+"1","elevation     slope 
+ -9.39341   2.75494 
+"
+"0","b_SMA <- coef(sma_model)[2]"
+"0","b_SMA"
+"1","  slope 
+2.75494 
+"
+"0","# 🔴 donne un b_SMA de 2.75494"

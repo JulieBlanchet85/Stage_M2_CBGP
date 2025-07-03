@@ -1,0 +1,20 @@
+"0","## Intensité"
+"0","SelectionModels_intensite_glmm<-MuMIn::dredge(glmm_intensite,rank = ""AICc"")"
+"2","G3;Fixed terms are ""cond((Int))"" and ""disp((Int))""
+g"
+"0","TopModels_intensite_glmm<-subset(SelectionModels_intensite_glmm,delta<2) "
+"0","TopModels_intensite_glmm"
+"1","Global model call: glmmTMB::glmmTMB(formula = heligmosomoides_polygyrus ~ sexe + 
+    poids_z + SMI_z + habitat1 + richesse_spe_AP_z + (1 | numero_ligne), 
+    data = t_infectes, family = nbinom2, na.action = na.fail, 
+    ziformula = ~0, dispformula = ~1)
+---
+Model selection table 
+   cnd((Int)) dsp((Int)) cnd(hb1) cnd(pds_z) cnd(sex) cnd(SMI_z) df   logLik  AICc delta weight
+28      1.328          +        +     0.6695        +    -0.4121  8 -319.221 656.1  0.00  0.664
+20      1.127          +        +     0.6409             -0.3729  7 -321.093 657.5  1.36  0.336
+Models ranked by AICc(x) 
+Random terms (all models): 
+  cond(1 | numero_ligne)
+
+"

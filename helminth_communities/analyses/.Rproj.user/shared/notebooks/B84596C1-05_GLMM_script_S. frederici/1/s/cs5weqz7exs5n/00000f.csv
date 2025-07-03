@@ -1,0 +1,10 @@
+"0","attach(t_infectes)"
+"2","G3;Les objets suivants sont masqués depuis t_infectes (pos = 3):
+
+    aspiculuris_tetraptera, code_rongeur, demogroup, gestation, habitat1, habitat2,
+    heligmosomoides_polygyrus, hydatigera_parva, hymenolepis_hiberna, longueur_tete_corps, numero_ligne,
+    poids, poids_z, richesse_spe_AP, richesse_spe_AP_z, sexe, skrjabinotaenia_lobata, SMI, SMI_z,
+    syphacia_ant, syphacia_caecum, syphacia_post, trichuris
+
+g"
+"0","emmeans::emmeans(ModelSelected_intensite_glmm,pairwise ~ habitat1, type = 'response') #response c'est pour remettre sur l'echelle réelle (c'est du début, donc le nb de paraasite)"

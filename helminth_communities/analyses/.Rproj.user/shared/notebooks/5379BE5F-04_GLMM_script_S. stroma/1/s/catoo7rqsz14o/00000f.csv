@@ -1,0 +1,13 @@
+"0","## Intensité"
+"0","MuMIn::r.squaredGLMM(ModelSelected_intensite_glmm)"
+"2","G2;H2;Avis h: the null model is only correct if all the variables it uses are identical 
+to those used in fitting the original model.g
+"
+"1","                R2m       R2c
+delta     0.2655760 0.2655760
+lognormal 0.3538999 0.3538999
+trigamma  0.1684269 0.1684269
+"
+"0","#R2m = part de la varaince expliquée par les effets fixes "
+"0","#R2c = part de la variance expliquée par effets fixes + aléatoires"
+"0","#Donne % de la variance expliquée par le modèle"

@@ -1,0 +1,122 @@
+# Prévalences bactéries
+
+```{r, include = FALSE}
+library(dplyr)
+library(here)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+```
+
+### Chargement
+
+```{r}
+data <- read.csv(here::here("GLMM/data/derived_data/20250522_jd_complet.csv"), sep = ",")
+```
+
+```{r}
+autres_pathos <- read.csv(here::here("GLMM/data/raw_data/20250414_others_pathos.csv"), sep = ";")
+
+autres_pathos <- autres_pathos %>%
+  rename(richesse_spe_AP = number_pathos)%>%
+  rename(code_rongeur = numero_centre)
+  
+```
+
+### Filtre des lignes qui sont en commun avec data
+
+```{r}
+autres_pathos <- autres_pathos %>%
+  dplyr::filter(code_rongeur %in% data$code_rongeur)
+```
+
+### Calcul des prévalences des richesse de bactéries
+
+```{r}
+# Regrouper les colonnes par le préfixe (avant le "_"), ou garder le nom tel quel s'il n'y a pas de "_"
+df_long <- autres_pathos %>%
+  tidyr::pivot_longer(
+    cols = -c(code_rongeur, richesse_spe_AP),  # Garde ces colonnes intactes
+    names_to = "bact_full",
+    values_to = "val"
+  ) %>%
+  mutate(
+    genre = if_else(stringr::str_detect(bact_full, "_"),
+                    str_extract(bact_full, "^[^_]+"),
+                    bact_full)  # Si pas de "_", garde le nom tel quel
+  )
+
+# 3. Regrouper par échantillon + genre et combiner les valeurs (somme ou logique)
+df_grouped <- df_long %>%
+  group_by(code_rongeur, genre) %>%
+  summarise(val = as.integer(any(val == 1)), .groups = "drop")  # OU logique : 1 si au moins un 1
+
+# 4. Repasser au format large
+df_wide <- df_grouped %>%
+  pivot_wider(names_from = genre, values_from = val)
+
+# 5. Tu peux réintégrer `number_pathos` si besoin :
+df_final <- autres_pathos %>%
+  dplyr::select(code_rongeur, richesse_spe_AP) %>%
+  left_join(df_wide, by = "code_rongeur")
+```
+
+```{r}
+prevalences <- df_final %>%
+  dplyr::select(-code_rongeur, -richesse_spe_AP) %>%  
+  summarise(across(everything(), ~ mean(. == 1)*100))
+```
+
+```{r}
+# Calcul des prévalences
+prevalences_long <- df_final %>%
+  dplyr::select(-code_rongeur, -richesse_spe_AP) %>%
+  summarise(across(everything(), ~ mean(. == 1) * 100)) %>%
+  pivot_longer(everything(), names_to = "genre", values_to = "prevalence_pct") %>%
+  arrange(desc(prevalence_pct))  # trier du + fréquent au - fréquent
+
+```
+
+## Graphiques
+
+```{r}
+ggplot(prevalences_long, aes(x = reorder(genre, -prevalence_pct), y = prevalence_pct)) +
+  geom_col(fill = "#4E79A7") +
+  labs(title = "Prévalence des genres bactériens", x = "Genre", y = "Prévalence (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+ggplot(prevalences_long, aes(x = prevalence_pct, y = reorder(genre, prevalence_pct))) +
+  geom_col(fill = "#59A14F") +
+  labs(title = "Prévalence des genres bactériens", x = "Prévalence (%)", y = "Genre") +
+  theme_minimal()
+
+```
+
+```{r}
+ggplot(prevalences_long, aes(x = reorder(genre, prevalence_pct), y = prevalence_pct)) +
+  geom_segment(aes(xend = genre, y = 0, yend = prevalence_pct), color = "grey") +
+  geom_point(size = 3, color = "#EDC948") +
+  labs(title = "Prévalence des genres bactériens", x = "Genre", y = "Prévalence (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+library(treemapify)
+
+ggplot(prevalences_long, aes(area = prevalence_pct, fill = genre, label = paste0(genre, "\n", round(prevalence_pct, 1), "%"))) +
+  geom_treemap() +
+  geom_treemap_text(colour = "white", place = "center", grow = TRUE) +
+  labs(title = "Prévalence des genres bactériens (Treemap)") +
+  theme(legend.position = "none")
+
+```
+
+```{r}
+summary(autres_pathos$richesse_spe_AP)
+```
